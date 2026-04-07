@@ -9,6 +9,11 @@ export interface TripStop {
   name: string;
   category: string;
   description: string;
+  address?: string;
+  rating?: number;
+  reviewCount?: number;
+  tips?: string[];
+  openingHours?: string;
   transport?: {
     type: "walk" | "drive" | "bus" | "metro";
     duration: string;
@@ -101,9 +106,9 @@ export const trips: Trip[] = [
         distance: "10 km",
         spots: 3,
         stops: [
-          { number: 1, name: "Castle Square", category: "Landmark", description: "Start at the iconic Royal Castle square with its Sigismund Column.", transport: { type: "walk", duration: "12 min", distance: "900m" } },
-          { number: 2, name: "Old Town Market Square", category: "Landmark", description: "Explore the colorful townhouses and the Mermaid statue.", transport: { type: "walk", duration: "8 min", distance: "600m" } },
-          { number: 3, name: "Barbican", category: "Museum", description: "Visit the semicircular fortified outpost and city walls." },
+          { number: 1, name: "Castle Square", category: "Landmark", description: "Start at the iconic Royal Castle square with its Sigismund Column. The square is the main entrance to the Old Town and features a panoramic view of the Vistula river.", address: "Plac Zamkowy, 00-001 Warsaw, Poland", rating: 4.7, reviewCount: 12840, tips: ["Best photos at sunrise before the crowds arrive.", "The Royal Castle interior is worth the entrance fee.", "Free guided tours available on Sundays."], openingHours: "Open 24 hours", transport: { type: "walk", duration: "12 min", distance: "900m" } },
+          { number: 2, name: "Old Town Market Square", category: "Landmark", description: "Explore the colorful townhouses and the Mermaid statue. This medieval square was completely rebuilt after WWII destruction and is now a UNESCO World Heritage Site.", address: "Rynek Starego Miasta, 00-272 Warsaw, Poland", rating: 4.6, reviewCount: 8920, tips: ["Try traditional Polish food at one of the restaurants around the square.", "The Mermaid statue is a great photo spot.", "Visit during Christmas for the holiday market."], openingHours: "Open 24 hours", transport: { type: "walk", duration: "8 min", distance: "600m" } },
+          { number: 3, name: "Barbican", category: "Museum", description: "Visit the semicircular fortified outpost and city walls. Built in 1540, it's one of the few remaining relics of the complex network of historic fortifications.", address: "ul. Nowomiejska 15/17, 00-257 Warsaw, Poland", rating: 4.5, reviewCount: 5430, tips: ["Walk along the top of the old city walls for great views.", "Art exhibitions are often held inside."], openingHours: "Opens at 10:00 AM" },
         ],
       },
       {

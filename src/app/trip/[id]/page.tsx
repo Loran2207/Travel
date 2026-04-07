@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { getTripById, TripDay } from "@/data/mock";
+import { getTripById, TripDay, TripStop } from "@/data/mock";
 import { useApp } from "@/context/AppContext";
 
 type TabValue = "overview" | number;
@@ -57,6 +57,7 @@ export default function TripDetailPage() {
 
   const trip = getTripById(params.id as string);
   const [activeTab, setActiveTab] = useState<TabValue>("overview");
+  const [selectedStop, setSelectedStop] = useState<TripStop | null>(null);
 
   // Bottom sheet drag
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -157,9 +158,12 @@ export default function TripDetailPage() {
                 )}
               </div>
 
-              {/* Card */}
+              {/* Card — clickable */}
               <div className="flex-1 pb-2">
-                <div className="bg-gray-50 rounded-xl p-3 flex gap-3">
+                <button
+                  onClick={() => setSelectedStop(stop)}
+                  className="w-full bg-gray-50 rounded-xl p-3 flex gap-3 text-left active:bg-gray-100 transition-colors"
+                >
                   <div className="w-16 h-16 rounded-lg bg-gray-200 flex-shrink-0 flex items-center justify-center">
                     <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                       <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -173,7 +177,7 @@ export default function TripDetailPage() {
                       {stop.category}
                     </span>
                   </div>
-                </div>
+                </button>
               </div>
             </div>
 
@@ -335,6 +339,112 @@ export default function TripDetailPage() {
           }
         </div>
       </div>
+
+      {/* Spot detail popup */}
+      {selectedStop && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div
+            className="absolute inset-0 bg-black/50 animate-fade-in"
+            onClick={() => setSelectedStop(null)}
+          />
+          <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl animate-slide-up max-h-[85vh] flex flex-col">
+            {/* Header: image + name + close */}
+            <div className="p-5 pb-3 flex gap-4">
+              <div className="w-24 h-24 rounded-xl bg-gray-200 flex-shrink-0 flex items-center justify-center">
+                <svg className="w-8 h-8 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold text-gray-900">{selectedStop.name}</h2>
+                {selectedStop.rating && (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <svg
+                          key={star}
+                          className="w-3.5 h-3.5"
+                          viewBox="0 0 24 24"
+                          fill={star <= Math.round(selectedStop.rating!) ? "currentColor" : "none"}
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                        >
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01z" />
+                        </svg>
+                      ))}
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {selectedStop.rating} ({selectedStop.reviewCount?.toLocaleString()})
+                    </span>
+                  </div>
+                )}
+                <span className="inline-block text-[10px] px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full mt-2 border border-gray-200">
+                  {selectedStop.category}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedStop(null)}
+                className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 self-start"
+              >
+                <span className="text-gray-500 text-sm">&times;</span>
+              </button>
+            </div>
+
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto px-5 pb-6">
+              {/* Description */}
+              <p className="text-sm text-gray-600 leading-relaxed">
+                {selectedStop.description}
+              </p>
+
+              {/* Tips */}
+              {selectedStop.tips && selectedStop.tips.length > 0 && (
+                <div className="mt-4 bg-gray-50 rounded-xl p-4 border border-gray-100">
+                  <p className="text-xs font-bold text-gray-900 mb-2">Tips from travelers</p>
+                  <div className="space-y-2.5">
+                    {selectedStop.tips.map((tip, i) => (
+                      <div key={i} className="flex gap-2">
+                        <div className="w-1 bg-gray-300 rounded-full flex-shrink-0 mt-0.5" style={{ minHeight: 16 }} />
+                        <p className="text-xs text-gray-600 leading-relaxed">{tip}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Info rows */}
+              <div className="mt-4 border-t border-gray-100">
+                {selectedStop.openingHours && (
+                  <div className="flex items-center gap-3 py-3 border-b border-gray-100">
+                    <svg className="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 6v6l4 2" />
+                    </svg>
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-500">Hours</p>
+                      <p className="text-sm text-gray-900">{selectedStop.openingHours}</p>
+                    </div>
+                  </div>
+                )}
+                {selectedStop.address && (
+                  <div className="flex items-center gap-3 py-3 border-b border-gray-100">
+                    <svg className="w-4 h-4 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                      <circle cx="12" cy="9" r="2.5" />
+                    </svg>
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-500">Location</p>
+                      <p className="text-sm text-gray-900">{selectedStop.address}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
