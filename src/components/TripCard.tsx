@@ -16,9 +16,13 @@ export function TripCard({ trip, compact = false }: TripCardProps) {
       <div
         className={`w-full ${imageHeight} bg-gray-200 flex items-center justify-center`}
       >
-        <span className="text-gray-500 text-sm">
-          📍 {trip.city}
-        </span>
+        <div className="flex items-center gap-1.5 text-gray-500 text-sm">
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+            <circle cx="12" cy="9" r="2.5" />
+          </svg>
+          {trip.city}
+        </div>
       </div>
       <div className="p-3">
         <h3 className="font-bold text-sm text-gray-900">{trip.title}</h3>
@@ -32,14 +36,17 @@ export function TripCard({ trip, compact = false }: TripCardProps) {
             </span>
           ))}
         </div>
-        <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
-          <span>⭐ {trip.rating}</span>
+        <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-500 flex-wrap">
+          <span className="flex items-center gap-0.5">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01z"/></svg>
+            {trip.rating}
+          </span>
           <span>·</span>
-          <span>📍 {trip.places} places</span>
+          <span>{trip.places} places</span>
           <span>·</span>
-          <span>🚶 {trip.steps} steps</span>
+          <span>{trip.steps} steps</span>
           <span>·</span>
-          <span>💰 ${trip.pricePerPerson}/person</span>
+          <span>${trip.pricePerPerson}/person</span>
         </div>
         <div className="mt-2 text-right">
           <Link

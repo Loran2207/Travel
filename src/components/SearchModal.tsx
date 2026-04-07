@@ -164,7 +164,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
                 placeholder="Search destinations"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="flex-1 text-sm focus:outline-none bg-transparent"
+                className="flex-1 text-[16px] leading-tight focus:outline-none bg-transparent"
               />
               {query && (
                 <button
@@ -416,7 +416,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
                       value={customDays}
                       onChange={(e) => setCustomDays(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") handleCustomApply(); }}
-                      className="flex-1 text-sm focus:outline-none bg-transparent w-full"
+                      className="flex-1 text-[16px] leading-tight focus:outline-none bg-transparent w-full"
                     />
                     <span className="text-sm text-gray-400 ml-2">days</span>
                   </div>

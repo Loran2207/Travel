@@ -24,9 +24,23 @@
 - State: React Context (`AppContext`) with SearchState including `cityId`, `cityName`, `duration`, `interests`, `budget`, `guests`, `checkIn`, `checkOut`
 - Data: `src/data/mock.ts` — cities, trips, interests, budgetOptions, search/filter functions
 
-## Responsive
+## Mobile-First Rules
 
+- All `<input>` elements MUST use `text-[16px]` or larger — iOS Safari zooms the page on focus if font-size < 16px
+- Touch targets: minimum 44x44px for all interactive elements
+- Viewport is locked: `maximum-scale=1` to prevent pinch-zoom issues
 - Container: `max-w-[430px]` on layout, BottomNav, and SearchModal
-- Full-screen search overlay fills viewport on mobile
-- Calendar grid uses `grid-cols-7` with aspect-square cells
+- Full-screen search overlay fills viewport on mobile (min 320px width)
 - Overflow scrolling with `hide-scrollbar` utility class
+
+## QA Testing (MANDATORY)
+
+**After every code iteration**, run the QA testing agent defined in `.claude/agents/qa-tester.md`:
+- Build must pass with zero errors
+- No iOS zoom bugs (inputs >= 16px)
+- No color violations (black/white/gray only)
+- All interactive flows work: search, slider, chips, navigation
+- Data consistency: selected values match displayed summaries
+- Responsive: no overflow, proper touch targets, modals fit screen
+
+This is non-negotiable — every change must be verified before committing.
