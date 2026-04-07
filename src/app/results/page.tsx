@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
-import { filterTrips, trips, interests, budgetOptions } from "@/data/mock";
+import { filterTrips, trips, interests } from "@/data/mock";
 import { TripCard } from "@/components/TripCard";
 
 type SortOption = "recommended" | "rating" | "price";
@@ -14,32 +14,61 @@ export default function ResultsPage() {
   const [sort, setSort] = useState<SortOption>("recommended");
   const [showFilters, setShowFilters] = useState(false);
 
+  // Price constants
+  const PRICE_MIN = 0;
+  const PRICE_MAX = 80;
+  const PRICE_STEP = 5;
+
   // Local filter state (applied on "Show trips")
   const [filterInterests, setFilterInterests] = useState<string[]>(state.search.interests);
-  const [filterBudget, setFilterBudget] = useState(state.search.budget);
+  const [filterPriceMin, setFilterPriceMin] = useState(PRICE_MIN);
+  const [filterPriceMax, setFilterPriceMax] = useState(PRICE_MAX);
 
   // Applied filters
   const [appliedInterests, setAppliedInterests] = useState<string[]>(state.search.interests);
-  const [appliedBudget, setAppliedBudget] = useState(state.search.budget);
+  const [appliedPriceMin, setAppliedPriceMin] = useState(PRICE_MIN);
+  const [appliedPriceMax, setAppliedPriceMax] = useState(PRICE_MAX);
+
+  const priceSliderRef = useRef<HTMLDivElement>(null);
 
   const { cityId, cityName, duration } = state.search;
 
+  // Histogram bars for price distribution
+  const priceHistogram = useMemo(() => {
+    const buckets = Math.ceil((PRICE_MAX - PRICE_MIN) / PRICE_STEP);
+    const counts = new Array(buckets).fill(0);
+    const allTrips = cityId ? trips.filter(t => t.cityId === cityId) : trips;
+    allTrips.forEach(t => {
+      const idx = Math.min(Math.floor((t.pricePerPerson - PRICE_MIN) / PRICE_STEP), buckets - 1);
+      if (idx >= 0) counts[idx]++;
+    });
+    const max = Math.max(...counts, 1);
+    return counts.map(c => c / max);
+  }, [cityId]);
+
   const results = useMemo(() => {
-    const hasFilters = cityId || appliedInterests.length > 0 || appliedBudget;
+    const hasPriceFilter = appliedPriceMin > PRICE_MIN || appliedPriceMax < PRICE_MAX;
+    const hasFilters = cityId || appliedInterests.length > 0 || hasPriceFilter;
+
     let r = hasFilters
-      ? filterTrips({ cityId, interests: appliedInterests, budget: appliedBudget })
+      ? filterTrips({ cityId, interests: appliedInterests, budget: "" })
       : [...trips];
+
+    if (hasPriceFilter) {
+      r = r.filter(t => t.pricePerPerson >= appliedPriceMin && t.pricePerPerson <= appliedPriceMax);
+    }
 
     if (sort === "rating") r = [...r].sort((a, b) => b.rating - a.rating);
     else if (sort === "price") r = [...r].sort((a, b) => a.pricePerPerson - b.pricePerPerson);
     return r;
-  }, [cityId, appliedInterests, appliedBudget, sort]);
+  }, [cityId, appliedInterests, appliedPriceMin, appliedPriceMax, sort]);
 
   const pillText = cityName
     ? `${cityName}${duration ? ` · ${duration}d` : ""}`
     : "All destinations";
 
-  const activeFilterCount = appliedInterests.length + (appliedBudget ? 1 : 0);
+  const hasPriceActive = appliedPriceMin > PRICE_MIN || appliedPriceMax < PRICE_MAX;
+  const activeFilterCount = appliedInterests.length + (hasPriceActive ? 1 : 0);
 
   const toggleFilterInterest = (interest: string) => {
     setFilterInterests(prev =>
@@ -49,19 +78,48 @@ export default function ResultsPage() {
 
   const handleApplyFilters = () => {
     setAppliedInterests([...filterInterests]);
-    setAppliedBudget(filterBudget);
+    setAppliedPriceMin(filterPriceMin);
+    setAppliedPriceMax(filterPriceMax);
     setShowFilters(false);
   };
 
   const handleClearFilters = () => {
     setFilterInterests([]);
-    setFilterBudget("");
+    setFilterPriceMin(PRICE_MIN);
+    setFilterPriceMax(PRICE_MAX);
   };
 
   const openFilters = () => {
     setFilterInterests([...appliedInterests]);
-    setFilterBudget(appliedBudget);
+    setFilterPriceMin(appliedPriceMin);
+    setFilterPriceMax(appliedPriceMax);
     setShowFilters(true);
+  };
+
+  const getPriceFromX = (clientX: number) => {
+    if (!priceSliderRef.current) return 0;
+    const rect = priceSliderRef.current.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const raw = PRICE_MIN + pct * (PRICE_MAX - PRICE_MIN);
+    return Math.round(raw / PRICE_STEP) * PRICE_STEP;
+  };
+
+  const startPriceDrag = (thumb: "min" | "max", startX: number, isTouch: boolean) => {
+    const onMove = (ev: MouseEvent | TouchEvent) => {
+      const x = "touches" in ev ? ev.touches[0].clientX : ev.clientX;
+      const val = getPriceFromX(x);
+      if (thumb === "min") {
+        setFilterPriceMin(Math.min(val, filterPriceMax - PRICE_STEP));
+      } else {
+        setFilterPriceMax(Math.max(val, filterPriceMin + PRICE_STEP));
+      }
+    };
+    const onEnd = () => {
+      window.removeEventListener(isTouch ? "touchmove" : "mousemove", onMove);
+      window.removeEventListener(isTouch ? "touchend" : "mouseup", onEnd);
+    };
+    window.addEventListener(isTouch ? "touchmove" : "mousemove", onMove, isTouch ? { passive: true } : undefined);
+    window.addEventListener(isTouch ? "touchend" : "mouseup", onEnd);
   };
 
   return (
@@ -81,7 +139,7 @@ export default function ResultsPage() {
           {/* Search pill */}
           <button
             onClick={() => router.back()}
-            className="flex-1 bg-white border border-gray-200 rounded-full px-4 py-2 shadow-sm text-left"
+            className="flex-1 bg-white border border-gray-200 rounded-full px-4 py-2 shadow-sm text-center"
           >
             <p className="text-sm font-semibold text-gray-900 truncate">{pillText}</p>
             <p className="text-xs text-gray-500 truncate">
@@ -195,28 +253,77 @@ export default function ResultsPage() {
 
               <div className="h-px bg-gray-100 mb-6" />
 
-              {/* Price range */}
+              {/* Price range — Airbnb style */}
               <div className="mb-6">
                 <h3 className="text-lg font-bold text-gray-900 mb-1">Price range</h3>
-                <p className="text-xs text-gray-500 mb-4">Per person, per trip</p>
-                <div className="grid grid-cols-2 gap-3">
-                  {budgetOptions.map((opt) => {
-                    const selected = filterBudget === opt.value;
+                <p className="text-xs text-gray-500 mb-5">Per person, per trip</p>
+
+                {/* Histogram */}
+                <div className="flex items-end gap-px h-16 mb-2 px-1">
+                  {priceHistogram.map((h, i) => {
+                    const bucketMin = PRICE_MIN + i * PRICE_STEP;
+                    const inRange = bucketMin >= filterPriceMin && bucketMin < filterPriceMax;
                     return (
-                      <button
-                        key={opt.value}
-                        onClick={() => setFilterBudget(selected ? "" : opt.value)}
-                        className={`p-4 rounded-2xl border-2 text-left transition-colors ${
-                          selected
-                            ? "border-black bg-gray-50"
-                            : "border-gray-200 hover:border-gray-300"
-                        }`}
+                      <div
+                        key={i}
+                        className="flex-1 rounded-t-sm transition-colors"
+                        style={{ height: `${Math.max(h * 100, 4)}%` }}
                       >
-                        <p className="text-sm font-bold text-gray-900">{opt.label}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{opt.description}</p>
-                      </button>
+                        <div
+                          className={`w-full h-full rounded-t-sm ${inRange ? "bg-gray-900" : "bg-gray-200"}`}
+                        />
+                      </div>
                     );
                   })}
+                </div>
+
+                {/* Dual thumb slider */}
+                <div
+                  ref={priceSliderRef}
+                  className="relative h-10 select-none touch-none"
+                >
+                  {/* Track */}
+                  <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-0.5 bg-gray-300 rounded-full">
+                    <div
+                      className="absolute top-0 h-full bg-black rounded-full"
+                      style={{
+                        left: `${((filterPriceMin - PRICE_MIN) / (PRICE_MAX - PRICE_MIN)) * 100}%`,
+                        right: `${100 - ((filterPriceMax - PRICE_MIN) / (PRICE_MAX - PRICE_MIN)) * 100}%`,
+                      }}
+                    />
+                  </div>
+
+                  {/* Min thumb */}
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-7 h-7 bg-white border-2 border-gray-400 rounded-full shadow cursor-grab active:cursor-grabbing z-10"
+                    style={{ left: `${((filterPriceMin - PRICE_MIN) / (PRICE_MAX - PRICE_MIN)) * 100}%` }}
+                    onMouseDown={(e) => { e.preventDefault(); startPriceDrag("min", e.clientX, false); }}
+                    onTouchStart={(e) => startPriceDrag("min", e.touches[0].clientX, true)}
+                  />
+
+                  {/* Max thumb */}
+                  <div
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-7 h-7 bg-white border-2 border-gray-400 rounded-full shadow cursor-grab active:cursor-grabbing z-10"
+                    style={{ left: `${((filterPriceMax - PRICE_MIN) / (PRICE_MAX - PRICE_MIN)) * 100}%` }}
+                    onMouseDown={(e) => { e.preventDefault(); startPriceDrag("max", e.clientX, false); }}
+                    onTouchStart={(e) => startPriceDrag("max", e.touches[0].clientX, true)}
+                  />
+                </div>
+
+                {/* Min / Max labels */}
+                <div className="flex justify-between mt-2">
+                  <div className="text-center">
+                    <p className="text-[10px] text-gray-500">Minimum</p>
+                    <div className="mt-1 border border-gray-300 rounded-full px-3 py-1">
+                      <span className="text-xs font-medium text-gray-900">${filterPriceMin}</span>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-gray-500">Maximum</p>
+                    <div className="mt-1 border border-gray-300 rounded-full px-3 py-1">
+                      <span className="text-xs font-medium text-gray-900">${filterPriceMax}{filterPriceMax >= PRICE_MAX ? "+" : ""}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
