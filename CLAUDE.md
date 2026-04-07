@@ -9,12 +9,11 @@
 
 ## Search Modal (Airbnb-style)
 
-- Accordion pattern with 3 collapsible sections: **Where**, **When**, **Who**
+- Accordion pattern with 2 collapsible sections: **Where**, **How long**
 - Only one section expanded at a time; others show collapsed summary row
-- No tabs at the top (no Trips/Experiences/Services) — this is purely a trip search
+- No tabs, no "Who" section — this is purely a trip search
 - **Where**: Search bar opens full-screen overlay with back arrow, type-ahead results using `searchCities()`, suggested cities from `mock.ts`
-- **When**: Toggle between Dates (calendar picker with month nav) and Flexible (duration chips + month cards). Flexibility chips: Exact, ±1/2/3/7 days
-- **Who**: Guest counter rows (Adults, Children, Infants) with +/- buttons
+- **How long**: Custom slider with snap checkpoints (Half day, 1 day, 2 days, 3 days, 5 days, 1 week, 2 weeks, 3 weeks) + quick pick chips for fast selection. Slider uses touch/mouse events with snap-to-nearest logic.
 - Bottom bar: "Clear all" (underline link) + "Search" (black button with search icon)
 - Max height: 95vh, scrollable content area
 
