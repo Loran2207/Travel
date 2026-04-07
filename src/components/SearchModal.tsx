@@ -13,53 +13,6 @@ type Section = "where" | "when" | "who" | null;
 type DateMode = "dates" | "flexible";
 type FlexDuration = "weekend" | "week" | "month";
 
-const SUGGESTED_DESTINATIONS = [
-  { id: "", name: "Nearby", subtitle: "Find what's around you", icon: "navigate" },
-  { id: "rome", name: "Rome, Lazio", subtitle: "For its stunning architecture", icon: "colosseum" },
-  { id: "barcelona", name: "Barcelona, Spain", subtitle: "For its vibrant culture", icon: "gaudi" },
-  { id: "prague", name: "Prague, Czech Republic", subtitle: "For its fairy-tale charm", icon: "castle" },
-  { id: "berlin", name: "Berlin, Germany", subtitle: "For its rich history", icon: "gate" },
-];
-
-function getDestinationIcon(icon: string) {
-  const iconMap: Record<string, { bg: string; content: string }> = {
-    navigate: { bg: "bg-blue-50", content: "text-blue-500" },
-    colosseum: { bg: "bg-red-50", content: "text-red-500" },
-    gaudi: { bg: "bg-orange-50", content: "text-orange-500" },
-    castle: { bg: "bg-purple-50", content: "text-purple-500" },
-    gate: { bg: "bg-green-50", content: "text-green-500" },
-    location: { bg: "bg-gray-100", content: "text-gray-600" },
-  };
-  const style = iconMap[icon] || iconMap.location;
-  const symbols: Record<string, string> = {
-    navigate: "\u2197",
-    colosseum: "\u26D1",
-    gaudi: "\u2616",
-    castle: "\u265C",
-    gate: "\u2302",
-    location: "\u25CB",
-  };
-  return (
-    <div className={`w-12 h-12 rounded-xl ${style.bg} flex items-center justify-center flex-shrink-0`}>
-      <span className={`text-lg ${style.content}`}>{symbols[icon] || "\u25CB"}</span>
-    </div>
-  );
-}
-
-function getSearchResultIcon(type: string) {
-  const symbols: Record<string, string> = {
-    city: "\u{1F4CD}",
-    station: "\u{1F689}",
-    neighborhood: "\u{1F3E0}",
-    landmark: "\u{1F52D}",
-  };
-  return (
-    <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
-      <span className="text-base text-gray-500">{symbols[type] || symbols.city}</span>
-    </div>
-  );
-}
-
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -73,7 +26,7 @@ function getDaysInMonth(year: number, month: number) {
 
 function getFirstDayOfMonth(year: number, month: number) {
   const day = new Date(year, month, 1).getDay();
-  return day === 0 ? 6 : day - 1; // Monday = 0
+  return day === 0 ? 6 : day - 1;
 }
 
 export function SearchModal({ onClose }: SearchModalProps) {
@@ -83,11 +36,11 @@ export function SearchModal({ onClose }: SearchModalProps) {
   const [activeSection, setActiveSection] = useState<Section>("where");
   const [searchFocused, setSearchFocused] = useState(false);
 
-  // Where state
+  // Where
   const [query, setQuery] = useState("");
   const [selectedCity, setSelectedCity] = useState({ id: "", name: "" });
 
-  // When state
+  // When
   const [dateMode, setDateMode] = useState<DateMode>("dates");
   const [checkIn, setCheckIn] = useState<Date | null>(null);
   const [checkOut, setCheckOut] = useState<Date | null>(null);
@@ -99,7 +52,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
   const [flexMonths, setFlexMonths] = useState<string[]>([]);
   const [dateFlex, setDateFlex] = useState<string>("exact");
 
-  // Who state
+  // Who
   const [adults, setAdults] = useState(0);
   const [children, setChildren] = useState(0);
   const [infants, setInfants] = useState(0);
@@ -110,6 +63,8 @@ export function SearchModal({ onClose }: SearchModalProps) {
     if (query.length === 0) return [];
     return searchCities(query);
   }, [query]);
+
+  const suggestedCities = useMemo(() => cities.slice(0, 5), []);
 
   const handleCitySelect = useCallback((id: string, name: string) => {
     setSelectedCity({ id, name });
@@ -150,6 +105,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
       duration,
       interests: [],
       budget: "",
+      guests: totalGuests + infants,
     });
     onClose();
     router.push("/results");
@@ -172,7 +128,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
   const formatDateRange = () => {
     if (checkIn && checkOut) {
       const fmt = (d: Date) => `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`;
-      return `${fmt(checkIn)} - ${fmt(checkOut)}`;
+      return `${fmt(checkIn)} – ${fmt(checkOut)}`;
     }
     if (checkIn) {
       return `${checkIn.getDate()} ${MONTHS[checkIn.getMonth()].slice(0, 3)}`;
@@ -191,19 +147,18 @@ export function SearchModal({ onClose }: SearchModalProps) {
     return parts.join(", ");
   };
 
-  // Full-screen destination search overlay
+  // --- Full-screen search overlay ---
   if (activeSection === "where" && searchFocused) {
     return (
       <div className="fixed inset-0 z-50 flex justify-center">
         <div className="w-full max-w-[430px] bg-white flex flex-col h-full">
-          {/* Search header */}
           <div className="p-4 pt-3">
             <div className="flex items-center gap-3 border border-gray-300 rounded-full px-4 py-3">
               <button
                 onClick={() => setSearchFocused(false)}
                 className="text-gray-800 text-lg flex-shrink-0"
               >
-                &larr;
+                &#8592;
               </button>
               <input
                 type="text"
@@ -224,10 +179,8 @@ export function SearchModal({ onClose }: SearchModalProps) {
             </div>
           </div>
 
-          {/* Results */}
           <div className="flex-1 overflow-y-auto px-4">
             {query.length > 0 ? (
-              /* Search results */
               <div>
                 {filteredCities.map((city) => (
                   <button
@@ -235,7 +188,12 @@ export function SearchModal({ onClose }: SearchModalProps) {
                     onClick={() => handleCitySelect(city.id, city.name)}
                     className="flex items-center gap-3 w-full py-3 text-left"
                   >
-                    {getSearchResultIcon("city")}
+                    <div className="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                        <circle cx="12" cy="9" r="2.5" />
+                      </svg>
+                    </div>
                     <div>
                       <p className="text-sm font-semibold text-gray-900">{city.name}</p>
                       <p className="text-xs text-gray-500">{city.country}</p>
@@ -247,24 +205,23 @@ export function SearchModal({ onClose }: SearchModalProps) {
                 )}
               </div>
             ) : (
-              /* Suggested destinations */
               <div>
                 <p className="text-sm font-semibold text-gray-900 mb-3">Suggested destinations</p>
-                {SUGGESTED_DESTINATIONS.map((dest) => (
+                {suggestedCities.map((city) => (
                   <button
-                    key={dest.name}
-                    onClick={() => {
-                      if (dest.id) {
-                        const city = cities.find(c => c.id === dest.id);
-                        if (city) handleCitySelect(city.id, city.name);
-                      }
-                    }}
+                    key={city.id}
+                    onClick={() => handleCitySelect(city.id, city.name)}
                     className="flex items-center gap-3 w-full py-3 text-left"
                   >
-                    {getDestinationIcon(dest.icon)}
+                    <div className="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                        <circle cx="12" cy="9" r="2.5" />
+                      </svg>
+                    </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{dest.name}</p>
-                      <p className="text-xs text-gray-500">{dest.subtitle}</p>
+                      <p className="text-sm font-semibold text-gray-900">{city.name}</p>
+                      <p className="text-xs text-gray-500">{city.country}</p>
                     </div>
                   </button>
                 ))}
@@ -276,7 +233,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
     );
   }
 
-  // Calendar rendering
+  // --- Calendar ---
   const renderCalendar = () => {
     const { year, month } = calendarMonth;
     const daysInMonth = getDaysInMonth(year, month);
@@ -286,7 +243,6 @@ export function SearchModal({ onClose }: SearchModalProps) {
 
     const cells: React.ReactNode[] = [];
 
-    // Empty cells before first day
     for (let i = 0; i < firstDay; i++) {
       cells.push(<div key={`empty-${i}`} />);
     }
@@ -304,7 +260,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
           key={day}
           disabled={isPast}
           onClick={() => handleDateClick(date)}
-          className={`aspect-square flex items-center justify-center text-sm rounded-full relative transition-colors
+          className={`aspect-square flex items-center justify-center text-sm rounded-full transition-colors
             ${isPast ? "text-gray-300 cursor-default" : ""}
             ${isSelected ? "bg-black text-white font-bold" : ""}
             ${isInRange ? "bg-gray-100" : ""}
@@ -330,14 +286,12 @@ export function SearchModal({ onClose }: SearchModalProps) {
 
     return (
       <div>
-        {/* Month navigation */}
         <div className="flex items-center justify-between mb-4">
-          <button onClick={prevMonth} className="p-1 text-gray-500 text-lg">&lsaquo;</button>
+          <button onClick={prevMonth} className="w-8 h-8 flex items-center justify-center text-gray-500 text-lg">&#8249;</button>
           <span className="text-sm font-bold text-gray-900">{MONTHS[month]} {year}</span>
-          <button onClick={nextMonth} className="p-1 text-gray-500 text-lg">&rsaquo;</button>
+          <button onClick={nextMonth} className="w-8 h-8 flex items-center justify-center text-gray-500 text-lg">&#8250;</button>
         </div>
 
-        {/* Weekday headers */}
         <div className="grid grid-cols-7 mb-2">
           {WEEKDAYS.map((d, i) => (
             <div key={i} className="text-center text-xs font-medium text-gray-500 py-1">
@@ -346,7 +300,6 @@ export function SearchModal({ onClose }: SearchModalProps) {
           ))}
         </div>
 
-        {/* Days grid */}
         <div className="grid grid-cols-7 gap-y-1">
           {cells}
         </div>
@@ -354,7 +307,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
     );
   };
 
-  // Flexible months grid
+  // --- Flexible months ---
   const renderFlexibleMonths = () => {
     const now = new Date();
     const monthCards: { key: string; label: string; year: number }[] = [];
@@ -393,7 +346,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
     );
   };
 
-  // Guest counter row
+  // --- Guest row ---
   const GuestRow = ({
     label,
     subtitle,
@@ -421,15 +374,15 @@ export function SearchModal({ onClose }: SearchModalProps) {
           className={`w-8 h-8 rounded-full border flex items-center justify-center text-lg transition-colors ${
             value <= min
               ? "border-gray-200 text-gray-300 cursor-default"
-              : "border-gray-400 text-gray-600 hover:border-gray-600"
+              : "border-gray-400 text-gray-600 hover:border-black"
           }`}
         >
-          &minus;
+          &#8722;
         </button>
         <span className="w-6 text-center text-sm font-medium">{value}</span>
         <button
           onClick={onIncrement}
-          className="w-8 h-8 rounded-full border border-gray-400 text-gray-600 hover:border-gray-600 flex items-center justify-center text-lg transition-colors"
+          className="w-8 h-8 rounded-full border border-gray-400 text-gray-600 hover:border-black flex items-center justify-center text-lg transition-colors"
         >
           +
         </button>
@@ -437,6 +390,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
     </div>
   );
 
+  // --- Main modal ---
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
       <div
@@ -444,19 +398,8 @@ export function SearchModal({ onClose }: SearchModalProps) {
         onClick={onClose}
       />
       <div className="relative w-full max-w-[430px] bg-gray-100 rounded-t-3xl animate-slide-up flex flex-col" style={{ maxHeight: "95vh" }}>
-        {/* Top tabs + close */}
-        <div className="flex items-center justify-between px-6 pt-4 pb-2">
-          <div className="flex gap-6">
-            <button className="flex flex-col items-center gap-1">
-              <span className="text-xs font-bold text-gray-900 border-b-2 border-black pb-1">Trips</span>
-            </button>
-            <button className="flex flex-col items-center gap-1">
-              <span className="text-xs text-gray-400 pb-1">Experiences</span>
-            </button>
-            <button className="flex flex-col items-center gap-1">
-              <span className="text-xs text-gray-400 pb-1">Services</span>
-            </button>
-          </div>
+        {/* Header with close */}
+        <div className="flex items-center justify-end px-5 pt-4 pb-1">
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm"
@@ -465,9 +408,9 @@ export function SearchModal({ onClose }: SearchModalProps) {
           </button>
         </div>
 
-        {/* Scrollable accordion content */}
+        {/* Accordion sections */}
         <div className="flex-1 overflow-y-auto px-4 pb-4">
-          {/* WHERE section */}
+          {/* WHERE */}
           {activeSection === "where" ? (
             <div className="bg-white rounded-2xl p-5 mb-3 shadow-sm">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Where?</h2>
@@ -482,31 +425,29 @@ export function SearchModal({ onClose }: SearchModalProps) {
                 <span className="text-sm text-gray-400">Search destinations</span>
               </button>
 
-              {/* Suggested destinations */}
               <div className="mt-4">
                 <p className="text-sm font-semibold text-gray-900 mb-3">Suggested destinations</p>
-                {SUGGESTED_DESTINATIONS.map((dest) => (
+                {suggestedCities.map((city) => (
                   <button
-                    key={dest.name}
-                    onClick={() => {
-                      if (dest.id) {
-                        const city = cities.find(c => c.id === dest.id);
-                        if (city) handleCitySelect(city.id, city.name);
-                      }
-                    }}
+                    key={city.id}
+                    onClick={() => handleCitySelect(city.id, city.name)}
                     className="flex items-center gap-3 w-full py-2.5 text-left"
                   >
-                    {getDestinationIcon(dest.icon)}
+                    <div className="w-11 h-11 rounded-xl bg-gray-100 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                        <circle cx="12" cy="9" r="2.5" />
+                      </svg>
+                    </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{dest.name}</p>
-                      <p className="text-xs text-gray-500">{dest.subtitle}</p>
+                      <p className="text-sm font-semibold text-gray-900">{city.name}</p>
+                      <p className="text-xs text-gray-500">{city.country}</p>
                     </div>
                   </button>
                 ))}
               </div>
             </div>
           ) : (
-            /* Collapsed WHERE */
             <button
               onClick={() => setActiveSection("where")}
               className="w-full bg-white rounded-2xl px-5 py-4 mb-3 shadow-sm flex items-center justify-between"
@@ -518,12 +459,11 @@ export function SearchModal({ onClose }: SearchModalProps) {
             </button>
           )}
 
-          {/* WHEN section */}
+          {/* WHEN */}
           {activeSection === "when" ? (
             <div className="bg-white rounded-2xl p-5 mb-3 shadow-sm">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">When?</h2>
 
-              {/* Dates / Flexible toggle */}
               <div className="flex bg-gray-100 rounded-full p-1 mb-5">
                 <button
                   onClick={() => setDateMode("dates")}
@@ -550,8 +490,6 @@ export function SearchModal({ onClose }: SearchModalProps) {
               {dateMode === "dates" ? (
                 <div>
                   {renderCalendar()}
-
-                  {/* Flexibility chips */}
                   <div className="flex gap-2 mt-4 overflow-x-auto hide-scrollbar pb-1">
                     {[
                       { label: "Exact dates", value: "exact" },
@@ -565,8 +503,8 @@ export function SearchModal({ onClose }: SearchModalProps) {
                         onClick={() => setDateFlex(opt.value)}
                         className={`px-4 py-2 rounded-full text-xs font-medium border whitespace-nowrap transition-colors ${
                           dateFlex === opt.value
-                            ? "border-black bg-white text-gray-900"
-                            : "border-gray-300 text-gray-600"
+                            ? "border-black text-gray-900"
+                            : "border-gray-300 text-gray-500"
                         }`}
                       >
                         {opt.label}
@@ -576,7 +514,6 @@ export function SearchModal({ onClose }: SearchModalProps) {
                 </div>
               ) : (
                 <div>
-                  {/* Duration options */}
                   <div className="mb-5">
                     <p className="text-sm font-semibold text-gray-900 mb-3">How long would you like to stay?</p>
                     <div className="flex gap-2">
@@ -586,8 +523,8 @@ export function SearchModal({ onClose }: SearchModalProps) {
                           onClick={() => setFlexDuration(prev => prev === d ? null : d)}
                           className={`px-5 py-2 rounded-full text-sm font-medium border transition-colors ${
                             flexDuration === d
-                              ? "border-black bg-white text-gray-900"
-                              : "border-gray-300 text-gray-600"
+                              ? "border-black text-gray-900"
+                              : "border-gray-300 text-gray-500"
                           }`}
                         >
                           {d.charAt(0).toUpperCase() + d.slice(1)}
@@ -604,7 +541,6 @@ export function SearchModal({ onClose }: SearchModalProps) {
               )}
             </div>
           ) : (
-            /* Collapsed WHEN */
             <button
               onClick={() => setActiveSection("when")}
               className="w-full bg-white rounded-2xl px-5 py-4 mb-3 shadow-sm flex items-center justify-between"
@@ -616,7 +552,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
             </button>
           )}
 
-          {/* WHO section */}
+          {/* WHO */}
           {activeSection === "who" ? (
             <div className="bg-white rounded-2xl p-5 mb-3 shadow-sm">
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Who?</h2>
@@ -630,7 +566,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
               <div className="border-t border-gray-100" />
               <GuestRow
                 label="Children"
-                subtitle="Ages 2 \u2013 12"
+                subtitle="Ages 2 – 12"
                 value={children}
                 onDecrement={() => setChildren(Math.max(0, children - 1))}
                 onIncrement={() => setChildren(children + 1)}
@@ -645,7 +581,6 @@ export function SearchModal({ onClose }: SearchModalProps) {
               />
             </div>
           ) : (
-            /* Collapsed WHO */
             <button
               onClick={() => setActiveSection("who")}
               className="w-full bg-white rounded-2xl px-5 py-4 mb-3 shadow-sm flex items-center justify-between"
@@ -659,7 +594,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
         </div>
 
         {/* Bottom bar */}
-        <div className="border-t border-gray-200 bg-white px-5 py-4 flex items-center justify-between rounded-b-none">
+        <div className="border-t border-gray-200 bg-white px-5 py-4 flex items-center justify-between">
           <button
             onClick={handleClearAll}
             className="text-sm font-semibold text-gray-900 underline"
@@ -668,7 +603,7 @@ export function SearchModal({ onClose }: SearchModalProps) {
           </button>
           <button
             onClick={handleSearch}
-            className="flex items-center gap-2 bg-[#E51D53] hover:bg-[#D31450] text-white px-6 py-3 rounded-xl text-sm font-bold transition-colors"
+            className="flex items-center gap-2 bg-black hover:bg-gray-800 text-white px-6 py-3 rounded-xl text-sm font-bold transition-colors"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <circle cx="11" cy="11" r="8" />
