@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AppProvider } from "@/context/AppContext";
 import { BottomNav } from "@/components/BottomNav";
+import { PageWrapper } from "@/components/PageWrapper";
 
 export const metadata: Metadata = {
   title: "Travel Up — AI Travel Itinerary",
@@ -24,7 +25,7 @@ export default function RootLayout({
       <body className="bg-gray-100">
         <AppProvider>
           <div className="mx-auto max-w-[430px] min-h-screen bg-white relative">
-            <div className="pb-20">{children}</div>
+            <PageWrapper>{children}</PageWrapper>
             <BottomNav />
           </div>
         </AppProvider>

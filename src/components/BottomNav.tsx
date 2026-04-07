@@ -11,6 +11,10 @@ export function BottomNav() {
   const isWishlist = pathname === "/wishlist";
   const isProfile = pathname === "/profile";
 
+  // Hide nav on detail/results pages
+  const hideOn = ["/results", "/trip"];
+  if (hideOn.some((p) => pathname.startsWith(p))) return null;
+
   const items = [
     {
       href: "/explore",
