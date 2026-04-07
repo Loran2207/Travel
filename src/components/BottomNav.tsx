@@ -14,7 +14,7 @@ export function BottomNav() {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[390px] bg-white border-t border-gray-200 z-40">
+      <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-gray-200 z-40">
         <div className="flex items-center justify-around h-16 px-4">
           {/* Explore */}
           <Link

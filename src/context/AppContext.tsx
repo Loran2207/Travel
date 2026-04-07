@@ -8,6 +8,9 @@ interface SearchState {
   duration: number;
   interests: string[];
   budget: string;
+  guests: number;
+  checkIn: string;
+  checkOut: string;
 }
 
 interface AppState {
@@ -30,6 +33,9 @@ const defaultSearch: SearchState = {
   duration: 2,
   interests: [],
   budget: "",
+  guests: 0,
+  checkIn: "",
+  checkOut: "",
 };
 
 const AppContext = createContext<AppContextType | null>(null);

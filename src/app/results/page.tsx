@@ -13,7 +13,7 @@ export default function ResultsPage() {
   const { state } = useApp();
   const [sort, setSort] = useState<SortOption>("recommended");
 
-  const { cityId, cityName, duration, interests, budget } = state.search;
+  const { cityId, cityName, duration, interests, budget, guests, checkIn, checkOut } = state.search;
 
   const hasFilters = cityId || interests.length > 0 || budget;
 
@@ -31,7 +31,13 @@ export default function ResultsPage() {
 
   const filterChips: string[] = [];
   if (cityName) filterChips.push(cityName);
-  if (duration) filterChips.push(`${duration} days`);
+  if (checkIn && checkOut) {
+    const fmt = (d: string) => { const dt = new Date(d); return `${dt.getDate()}/${dt.getMonth()+1}`; };
+    filterChips.push(`${fmt(checkIn)} - ${fmt(checkOut)}`);
+  } else if (duration) {
+    filterChips.push(`${duration} days`);
+  }
+  if (guests > 0) filterChips.push(`${guests} guest${guests !== 1 ? "s" : ""}`);
   if (interests.length > 0) filterChips.push(...interests.slice(0, 2));
   if (budget) filterChips.push(budget.charAt(0).toUpperCase() + budget.slice(1));
 

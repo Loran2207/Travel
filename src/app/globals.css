@@ -48,3 +48,10 @@ body {
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out forwards;
 }
+
+/* Safe area support for bottom bar */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
