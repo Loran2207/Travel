@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
 import { cities, searchCities, interests } from "@/data/mock";
@@ -25,40 +25,16 @@ const INTEREST_ICONS: Record<string, React.ReactNode> = {
   "Sports": <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 000 20M2 12h20" /></svg>,
 };
 
-// Slider checkpoints: value in hours
-const DURATION_STOPS = [
-  { value: 4, label: "Half day" },
-  { value: 8, label: "1 day" },
-  { value: 16, label: "2 days" },
-  { value: 24, label: "3 days" },
-  { value: 40, label: "5 days" },
-  { value: 56, label: "1 week" },
-  { value: 112, label: "2 weeks" },
-  { value: 168, label: "3 weeks" },
+// Duration picker options
+const DURATION_OPTIONS = [
+  "Half day", "1 day", "2 days", "3 days", "4 days", "5 days", "6 days",
+  "1 week", "10 days", "2 weeks", "3 weeks",
 ];
 
-const QUICK_CHIPS = [
-  { label: "Half day", value: 4 },
-  { label: "1 day", value: 8 },
-  { label: "2 days", value: 16 },
-  { label: "3 days", value: 24 },
-  { label: "1 week", value: 56 },
-  { label: "3 weeks", value: 168 },
-];
-
-function durationLabel(hours: number): string {
-  if (hours <= 4) return "Half day";
-  if (hours <= 8) return "1 day";
-  const days = Math.round(hours / 8);
-  if (days <= 7) return `${days} days`;
-  const weeks = Math.round(days / 7);
-  if (weeks === 1) return "1 week";
-  return `${weeks} weeks`;
-}
-
-function isChipValue(hours: number): boolean {
-  return QUICK_CHIPS.some(c => c.value === hours);
-}
+const DURATION_TO_DAYS: Record<string, number> = {
+  "Half day": 1, "1 day": 1, "2 days": 2, "3 days": 3, "4 days": 4,
+  "5 days": 5, "6 days": 6, "1 week": 7, "10 days": 10, "2 weeks": 14, "3 weeks": 21,
+};
 
 export function SearchModal({ onClose, initialCity }: SearchModalProps) {
   const router = useRouter();
@@ -71,15 +47,12 @@ export function SearchModal({ onClose, initialCity }: SearchModalProps) {
   const [query, setQuery] = useState("");
   const [selectedCity, setSelectedCity] = useState(initialCity || { id: "", name: "" });
 
-  // Duration (in hours)
-  const [durationHours, setDurationHours] = useState(8);
-  const [showCustom, setShowCustom] = useState(false);
-  const [customDays, setCustomDays] = useState("");
+  // Duration
+  const [selectedDuration, setSelectedDuration] = useState(1); // index into DURATION_OPTIONS
+  const pickerRef = useRef<HTMLDivElement>(null);
 
   // Preferences
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
-  const sliderRef = useRef<HTMLDivElement>(null);
-
   const filteredCities = useMemo(() => {
     if (query.length === 0) return [];
     return searchCities(query);
@@ -95,7 +68,8 @@ export function SearchModal({ onClose, initialCity }: SearchModalProps) {
   }, []);
 
   const handleSearch = () => {
-    const days = Math.max(1, Math.round(durationHours / 8));
+    const label = DURATION_OPTIONS[selectedDuration];
+    const days = DURATION_TO_DAYS[label] || 1;
     setSearch({
       cityId: selectedCity.id,
       cityName: selectedCity.name,
@@ -122,57 +96,35 @@ export function SearchModal({ onClose, initialCity }: SearchModalProps) {
   const handleClearAll = () => {
     setSelectedCity({ id: "", name: "" });
     setQuery("");
-    setDurationHours(8);
-    setShowCustom(false);
-    setCustomDays("");
+    setSelectedDuration(1);
     setSelectedInterests([]);
     setActiveSection("where");
   };
 
-  const handleCustomApply = () => {
-    const num = parseInt(customDays, 10);
-    if (num > 0) {
-      const minVal = DURATION_STOPS[0].value;
-      const maxVal = DURATION_STOPS[DURATION_STOPS.length - 1].value;
-      const hours = Math.min(Math.max(num * 8, minVal), maxVal);
-      setDurationHours(hours);
-      setShowCustom(false);
+  // Scroll picker to selected item
+  const scrollToSelected = useCallback((idx: number, smooth = true) => {
+    if (!pickerRef.current) return;
+    const itemH = 56;
+    const containerH = pickerRef.current.clientHeight;
+    const scrollTop = idx * itemH - (containerH / 2 - itemH / 2);
+    pickerRef.current.scrollTo({ top: scrollTop, behavior: smooth ? "smooth" : "auto" });
+  }, []);
+
+  useEffect(() => {
+    if (activeSection === "duration") {
+      setTimeout(() => scrollToSelected(selectedDuration, false), 50);
     }
-  };
+  }, [activeSection, scrollToSelected, selectedDuration]);
 
-  // Slider logic — free-form, no snap
-  const minVal = DURATION_STOPS[0].value;
-  const maxVal = DURATION_STOPS[DURATION_STOPS.length - 1].value;
-
-  const getPositionFromValue = (val: number) => {
-    return ((val - minVal) / (maxVal - minVal)) * 100;
-  };
-
-  const getValueFromPosition = (clientX: number) => {
-    if (!sliderRef.current) return durationHours;
-    const rect = sliderRef.current.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    const raw = minVal + pct * (maxVal - minVal);
-    return Math.round(raw);
-  };
-
-  const thumbPosition = getPositionFromValue(durationHours);
-
-  const startDrag = (startX: number, isTouch: boolean) => {
-    setDurationHours(getValueFromPosition(startX));
-    setShowCustom(false);
-
-    const onMove = (ev: MouseEvent | TouchEvent) => {
-      const x = "touches" in ev ? ev.touches[0].clientX : ev.clientX;
-      setDurationHours(getValueFromPosition(x));
-    };
-    const onEnd = () => {
-      window.removeEventListener(isTouch ? "touchmove" : "mousemove", onMove);
-      window.removeEventListener(isTouch ? "touchend" : "mouseup", onEnd);
-    };
-    window.addEventListener(isTouch ? "touchmove" : "mousemove", onMove, isTouch ? { passive: true } : undefined);
-    window.addEventListener(isTouch ? "touchend" : "mouseup", onEnd);
-  };
+  const handlePickerScroll = useCallback(() => {
+    if (!pickerRef.current) return;
+    const itemH = 56;
+    const containerH = pickerRef.current.clientHeight;
+    const scrollTop = pickerRef.current.scrollTop;
+    const idx = Math.round((scrollTop + containerH / 2 - itemH / 2) / itemH);
+    const clamped = Math.max(0, Math.min(DURATION_OPTIONS.length - 1, idx));
+    setSelectedDuration(clamped);
+  }, []);
 
   // --- Full-screen search overlay ---
   if (activeSection === "where" && searchFocused) {
@@ -330,134 +282,63 @@ export function SearchModal({ onClose, initialCity }: SearchModalProps) {
             </button>
           )}
 
-          {/* DURATION */}
+          {/* DURATION — drum picker */}
           {activeSection === "duration" ? (
             <div className="bg-white rounded-2xl p-5 mb-3 shadow-sm">
               <h2 className="text-2xl font-bold text-gray-900 mb-1">How long?</h2>
-              <p className="text-lg font-semibold text-gray-900 mb-6">
-                {durationLabel(durationHours)}
-              </p>
+              <p className="text-sm text-gray-500 mb-4">Number of days</p>
 
-              {/* Slider */}
-              <div className="px-1 mb-6">
+              {/* Drum picker */}
+              <div className="relative h-[224px] overflow-hidden">
+                {/* Selection highlight band */}
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-14 bg-gray-100 rounded-xl pointer-events-none z-0" />
+
+                {/* Fade gradients */}
+                <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-white to-transparent z-10 pointer-events-none" />
+                <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent z-10 pointer-events-none" />
+
+                {/* Scrollable list */}
                 <div
-                  ref={sliderRef}
-                  className="relative h-12 select-none touch-none"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    startDrag(e.clientX, false);
-                  }}
-                  onTouchStart={(e) => {
-                    startDrag(e.touches[0].clientX, true);
-                  }}
+                  ref={pickerRef}
+                  className="absolute inset-0 overflow-y-auto hide-scrollbar snap-y snap-mandatory"
+                  onScroll={handlePickerScroll}
+                  style={{ scrollSnapType: "y mandatory" }}
                 >
-                  {/* Track bg */}
-                  <div className="absolute top-1/2 -translate-y-1/2 left-0 right-0 h-1 bg-gray-200 rounded-full">
-                    <div
-                      className="absolute left-0 top-0 h-full bg-black rounded-full"
-                      style={{ width: `${thumbPosition}%` }}
-                    />
-                  </div>
+                  {/* Top spacer */}
+                  <div style={{ height: 84 }} />
 
-                  {/* Checkpoint dots */}
-                  {DURATION_STOPS.map((stop) => {
-                    const pos = getPositionFromValue(stop.value);
-                    const isActive = stop.value <= durationHours;
+                  {DURATION_OPTIONS.map((opt, i) => {
+                    const isSelected = i === selectedDuration;
+                    const dist = Math.abs(i - selectedDuration);
                     return (
                       <div
-                        key={stop.value}
-                        className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
-                        style={{ left: `${pos}%` }}
+                        key={opt}
+                        className="h-14 flex items-center justify-center snap-center cursor-pointer"
+                        style={{ scrollSnapAlign: "center" }}
+                        onClick={() => {
+                          setSelectedDuration(i);
+                          scrollToSelected(i);
+                        }}
                       >
-                        <div className={`w-2.5 h-2.5 rounded-full border-2 ${
-                          isActive
-                            ? "bg-black border-black"
-                            : "bg-white border-gray-300"
-                        }`} />
+                        <span
+                          className={`transition-all duration-150 ${
+                            isSelected
+                              ? "text-2xl font-bold text-gray-900"
+                              : dist === 1
+                                ? "text-lg text-gray-400"
+                                : "text-base text-gray-300"
+                          }`}
+                        >
+                          {opt}
+                        </span>
                       </div>
                     );
                   })}
 
-                  {/* Thumb */}
-                  <div
-                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-7 h-7 bg-white border-2 border-black rounded-full shadow-md cursor-grab active:cursor-grabbing"
-                    style={{ left: `${thumbPosition}%` }}
-                  />
-                </div>
-
-                {/* Labels under stops */}
-                <div className="relative h-4 mt-1">
-                  {DURATION_STOPS.filter((_, i) => i % 2 === 0 || i === DURATION_STOPS.length - 1).map((stop) => {
-                    const pos = getPositionFromValue(stop.value);
-                    return (
-                      <span
-                        key={stop.value}
-                        className="absolute -translate-x-1/2 text-[10px] text-gray-400 whitespace-nowrap"
-                        style={{ left: `${pos}%` }}
-                      >
-                        {stop.label}
-                      </span>
-                    );
-                  })}
+                  {/* Bottom spacer */}
+                  <div style={{ height: 84 }} />
                 </div>
               </div>
-
-              {/* Quick pick chips + Custom */}
-              <div className="flex flex-wrap gap-2">
-                {QUICK_CHIPS.map((chip) => (
-                  <button
-                    key={chip.value}
-                    onClick={() => {
-                      setDurationHours(chip.value);
-                      setShowCustom(false);
-                    }}
-                    className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
-                      durationHours === chip.value && !showCustom
-                        ? "border-black text-gray-900 bg-gray-50"
-                        : "border-gray-300 text-gray-500 hover:border-gray-400"
-                    }`}
-                  >
-                    {chip.label}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setShowCustom(!showCustom)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
-                    showCustom || !isChipValue(durationHours)
-                      ? "border-black text-gray-900 bg-gray-50"
-                      : "border-gray-300 text-gray-500 hover:border-gray-400"
-                  }`}
-                >
-                  Custom
-                </button>
-              </div>
-
-              {/* Custom input */}
-              {showCustom && (
-                <div className="mt-4 flex items-center gap-3 animate-fade-in">
-                  <div className="flex-1 flex items-center border border-gray-300 rounded-xl px-4 py-2.5 focus-within:border-black transition-colors">
-                    <input
-                      type="number"
-                      autoFocus
-                      min={1}
-                      max={21}
-                      placeholder="Enter days"
-                      value={customDays}
-                      onChange={(e) => setCustomDays(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") handleCustomApply(); }}
-                      className="flex-1 text-[16px] leading-tight focus:outline-none bg-transparent w-full"
-                    />
-                    <span className="text-sm text-gray-400 ml-2">days</span>
-                  </div>
-                  <button
-                    onClick={handleCustomApply}
-                    disabled={!customDays || parseInt(customDays, 10) <= 0}
-                    className="px-4 py-2.5 bg-black text-white rounded-xl text-sm font-medium disabled:bg-gray-300 disabled:cursor-default transition-colors"
-                  >
-                    Apply
-                  </button>
-                </div>
-              )}
             </div>
           ) : (
             <button
@@ -466,7 +347,7 @@ export function SearchModal({ onClose, initialCity }: SearchModalProps) {
             >
               <span className="text-sm text-gray-500">How long</span>
               <span className="text-sm font-semibold text-gray-900">
-                {durationLabel(durationHours)}
+                {DURATION_OPTIONS[selectedDuration]}
               </span>
             </button>
           )}
