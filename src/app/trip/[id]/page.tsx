@@ -51,6 +51,12 @@ export default function TripDetailPage() {
   // Transport picker
   const [transportPicker, setTransportPicker] = useState<{ dayNum: number; stopIdx: number } | null>(null);
 
+  // Add location
+  const [addLocationDay, setAddLocationDay] = useState<number | null>(null);
+  const [locationName, setLocationName] = useState("");
+  const [locationAddress, setLocationAddress] = useState("");
+  const [locationCategory, setLocationCategory] = useState("Place");
+
   // Bottom sheet
   const sheetRef = useRef<HTMLDivElement>(null);
   const [sheetPosition, setSheetPosition] = useState<"half" | "full" | "collapsed">("half");
@@ -214,6 +220,29 @@ export default function TripDetailPage() {
     setTransportPicker(null);
   };
 
+  const addLocation = () => {
+    if (!addLocationDay || !locationName.trim()) return;
+    const days = editedDays || trip.days.map(d => ({ ...d, stops: d.stops.map(s => ({ ...s })) }));
+    const newDays = days.map(d => {
+      if (d.day !== addLocationDay) return d;
+      const newStop: TripStop = {
+        number: d.stops.length + 1,
+        name: locationName.trim(),
+        category: locationCategory,
+        description: locationAddress.trim() || `Added location in ${d.city}`,
+        address: locationAddress.trim() || undefined,
+      };
+      return { ...d, stops: [...d.stops, newStop], spots: d.stops.length + 1 };
+    });
+    setEditedDays(newDays);
+    setAddLocationDay(null);
+    setLocationName("");
+    setLocationAddress("");
+    setLocationCategory("Place");
+  };
+
+  const LOCATION_CATEGORIES = ["Place", "Hotel", "Restaurant", "Bar", "Shop", "Transport", "Landmark", "Museum"];
+
   const renderOverview = () => (
     <div className="space-y-3">
       {currentDays.map((day, idx) => (
@@ -351,6 +380,34 @@ export default function TripDetailPage() {
             </div>
           );
         })}
+
+        {/* Add location button (when saved) */}
+        {saved && !editMode && (
+          <div className="flex gap-3 mt-2">
+            <div className="flex flex-col items-center w-7">
+              <div className="w-7 h-7 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center flex-shrink-0">
+                <svg className="w-3.5 h-3.5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </div>
+            </div>
+            <button
+              onClick={() => setAddLocationDay(day.day)}
+              className="flex-1 border-2 border-dashed border-gray-200 rounded-xl p-3 flex items-center gap-3 text-left hover:border-gray-300 hover:bg-gray-50 transition-colors"
+            >
+              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                  <path d="M12 7v4M10 9h4" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Add a location</p>
+                <p className="text-[10px] text-gray-400">Hotel, restaurant, attraction...</p>
+              </div>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -450,6 +507,87 @@ export default function TripDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Add location dialog */}
+      {addLocationDay !== null && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => setAddLocationDay(null)} />
+          <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl animate-slide-up flex flex-col" style={{ maxHeight: "85vh" }}>
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-gray-300 rounded-full" />
+            </div>
+
+            <div className="px-5 pb-3 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900">Add location</h3>
+              <button onClick={() => setAddLocationDay(null)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                <svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 pb-6">
+              <p className="text-xs text-gray-500 mb-5">
+                Paste an address from Google Maps or type the place name
+              </p>
+
+              {/* Name */}
+              <div className="mb-4">
+                <label className="text-xs font-medium text-gray-500 mb-1.5 block">Place name</label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={locationName}
+                  onChange={(e) => setLocationName(e.target.value)}
+                  placeholder="e.g. Hotel Mariot, Cafe Roma..."
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-[16px] focus:outline-none focus:border-black transition-colors"
+                />
+              </div>
+
+              {/* Address */}
+              <div className="mb-5">
+                <label className="text-xs font-medium text-gray-500 mb-1.5 block">Address</label>
+                <input
+                  type="text"
+                  value={locationAddress}
+                  onChange={(e) => setLocationAddress(e.target.value)}
+                  placeholder="Paste address from Google Maps"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-[16px] focus:outline-none focus:border-black transition-colors"
+                />
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="text-xs font-medium text-gray-500 mb-2 block">Category</label>
+                <div className="flex flex-wrap gap-2">
+                  {LOCATION_CATEGORIES.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setLocationCategory(cat)}
+                      className={`px-3.5 py-2 rounded-full text-sm font-medium border transition-colors ${
+                        locationCategory === cat
+                          ? "border-black text-gray-900 bg-gray-50"
+                          : "border-gray-300 text-gray-500"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Add button */}
+            <div className="border-t border-gray-200 px-5 py-4">
+              <button
+                onClick={addLocation}
+                disabled={!locationName.trim()}
+                className="w-full bg-black text-white py-3.5 rounded-xl text-sm font-bold disabled:bg-gray-300 disabled:cursor-default transition-colors"
+              >
+                Add to Day {addLocationDay}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Transport picker popup */}
       {transportPicker && (() => {
