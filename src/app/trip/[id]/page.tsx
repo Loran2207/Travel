@@ -53,9 +53,7 @@ export default function TripDetailPage() {
 
   // Add location
   const [addLocationDay, setAddLocationDay] = useState<number | null>(null);
-  const [locationName, setLocationName] = useState("");
-  const [locationAddress, setLocationAddress] = useState("");
-  const [locationCategory, setLocationCategory] = useState("Place");
+  const [locationInput, setLocationInput] = useState("");
 
   // Bottom sheet
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -221,27 +219,29 @@ export default function TripDetailPage() {
   };
 
   const addLocation = () => {
-    if (!addLocationDay || !locationName.trim()) return;
+    if (!addLocationDay || !locationInput.trim()) return;
+    const input = locationInput.trim();
+    // Try to parse: if it contains a comma, split into name + address
+    const parts = input.split(",");
+    const name = parts[0].trim();
+    const address = parts.length > 1 ? input : undefined;
+
     const days = editedDays || trip.days.map(d => ({ ...d, stops: d.stops.map(s => ({ ...s })) }));
     const newDays = days.map(d => {
       if (d.day !== addLocationDay) return d;
       const newStop: TripStop = {
         number: d.stops.length + 1,
-        name: locationName.trim(),
-        category: locationCategory,
-        description: locationAddress.trim() || `Added location in ${d.city}`,
-        address: locationAddress.trim() || undefined,
+        name,
+        category: "Place",
+        description: address || `Added to your trip`,
+        address,
       };
       return { ...d, stops: [...d.stops, newStop], spots: d.stops.length + 1 };
     });
     setEditedDays(newDays);
     setAddLocationDay(null);
-    setLocationName("");
-    setLocationAddress("");
-    setLocationCategory("Place");
+    setLocationInput("");
   };
-
-  const LOCATION_CATEGORIES = ["Place", "Hotel", "Restaurant", "Bar", "Shop", "Transport", "Landmark", "Museum"];
 
   const renderOverview = () => (
     <div className="space-y-3">
@@ -508,86 +508,80 @@ export default function TripDetailPage() {
         )}
       </div>
 
-      {/* Add location dialog */}
-      {addLocationDay !== null && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center">
-          <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => setAddLocationDay(null)} />
-          <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl animate-slide-up flex flex-col" style={{ maxHeight: "85vh" }}>
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 bg-gray-300 rounded-full" />
-            </div>
+      {/* Add location dialog — simplified */}
+      {addLocationDay !== null && (() => {
+        const input = locationInput.trim();
+        const parts = input.split(",");
+        const parsedName = parts[0]?.trim() || "";
+        const parsedAddress = parts.length > 1 ? input : "";
+        const hasInput = parsedName.length > 0;
 
-            <div className="px-5 pb-3 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900">Add location</h3>
-              <button onClick={() => setAddLocationDay(null)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                <svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 pb-6">
-              <p className="text-xs text-gray-500 mb-5">
-                Paste an address from Google Maps or type the place name
-              </p>
-
-              {/* Name */}
-              <div className="mb-4">
-                <label className="text-xs font-medium text-gray-500 mb-1.5 block">Place name</label>
-                <input
-                  type="text"
-                  autoFocus
-                  value={locationName}
-                  onChange={(e) => setLocationName(e.target.value)}
-                  placeholder="e.g. Hotel Mariot, Cafe Roma..."
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-[16px] focus:outline-none focus:border-black transition-colors"
-                />
+        return (
+          <div className="fixed inset-0 z-50 flex items-end justify-center">
+            <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => { setAddLocationDay(null); setLocationInput(""); }} />
+            <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl animate-slide-up flex flex-col" style={{ maxHeight: "80vh" }}>
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 bg-gray-300 rounded-full" />
               </div>
 
-              {/* Address */}
-              <div className="mb-5">
-                <label className="text-xs font-medium text-gray-500 mb-1.5 block">Address</label>
-                <input
-                  type="text"
-                  value={locationAddress}
-                  onChange={(e) => setLocationAddress(e.target.value)}
-                  placeholder="Paste address from Google Maps"
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-[16px] focus:outline-none focus:border-black transition-colors"
-                />
-              </div>
-
-              {/* Category */}
-              <div>
-                <label className="text-xs font-medium text-gray-500 mb-2 block">Category</label>
-                <div className="flex flex-wrap gap-2">
-                  {LOCATION_CATEGORIES.map((cat) => (
-                    <button
-                      key={cat}
-                      onClick={() => setLocationCategory(cat)}
-                      className={`px-3.5 py-2 rounded-full text-sm font-medium border transition-colors ${
-                        locationCategory === cat
-                          ? "border-black text-gray-900 bg-gray-50"
-                          : "border-gray-300 text-gray-500"
-                      }`}
-                    >
-                      {cat}
+              {/* Search input */}
+              <div className="px-5 pb-4">
+                <div className="flex items-center gap-3 border border-gray-300 rounded-xl px-4 py-3 focus-within:border-black transition-colors">
+                  <svg className="w-5 h-5 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                    <circle cx="12" cy="9" r="2.5" />
+                  </svg>
+                  <input
+                    type="text"
+                    autoFocus
+                    value={locationInput}
+                    onChange={(e) => setLocationInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && hasInput) addLocation(); }}
+                    placeholder="Name or paste address from Google Maps"
+                    className="flex-1 text-[16px] leading-tight focus:outline-none bg-transparent"
+                  />
+                  {locationInput && (
+                    <button onClick={() => setLocationInput("")} className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                      <span className="text-gray-500 text-xs">&times;</span>
                     </button>
-                  ))}
+                  )}
                 </div>
               </div>
-            </div>
 
-            {/* Add button */}
-            <div className="border-t border-gray-200 px-5 py-4">
-              <button
-                onClick={addLocation}
-                disabled={!locationName.trim()}
-                className="w-full bg-black text-white py-3.5 rounded-xl text-sm font-bold disabled:bg-gray-300 disabled:cursor-default transition-colors"
-              >
-                Add to Day {addLocationDay}
-              </button>
+              {/* Preview card + add button (appears when text entered) */}
+              {hasInput ? (
+                <div className="px-5 pb-6">
+                  <div className="bg-gray-50 rounded-2xl p-4 flex gap-3 mb-4">
+                    <div className="w-14 h-14 rounded-xl bg-gray-200 flex-shrink-0 flex items-center justify-center">
+                      <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                        <circle cx="12" cy="9" r="2.5" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-gray-900">{parsedName}</p>
+                      {parsedAddress && (
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">{parsedAddress}</p>
+                      )}
+                      <p className="text-[10px] text-gray-400 mt-1">Will be added to Day {addLocationDay}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={addLocation}
+                    className="w-full bg-black text-white py-3.5 rounded-xl text-sm font-bold transition-colors active:bg-gray-800"
+                  >
+                    Add to trip
+                  </button>
+                </div>
+              ) : (
+                <div className="px-5 pb-6 text-center">
+                  <p className="text-xs text-gray-400">Type a place name or paste a full address</p>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Transport picker popup */}
       {transportPicker && (() => {
