@@ -394,11 +394,11 @@ export default function TripDetailPage() {
                 </div>
               </div>
 
-              {/* Transport pill — inline toggle walk/drive when saved */}
+              {/* Transport pill — inline toggle walk/drive when saved + nav button */}
               {!editMode && stop.transport && (
                 <div className="flex gap-3 mb-2">
                   <div className="flex flex-col items-center w-7"><div className="w-px flex-1 bg-gray-200" /></div>
-                  <div className="flex-1 py-1">
+                  <div className="flex-1 py-1 flex items-center justify-between">
                     {saved ? (
                       <div className="inline-flex items-center bg-gray-100 rounded-full p-0.5">
                         {(["walk", "drive"] as const).map((mode) => {
@@ -425,6 +425,12 @@ export default function TripDetailPage() {
                         <span className="text-xs text-gray-600">{stop.transport.duration} · {stop.transport.distance}</span>
                       </div>
                     )}
+                    {/* Navigate button */}
+                    <button className="w-8 h-8 rounded-full bg-black flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M3 11l19-9-9 19-2-8-8-2z" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
               )}
@@ -797,6 +803,16 @@ export default function TripDetailPage() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Direction button */}
+            <div className="border-t border-gray-100 px-5 py-4">
+              <button className="w-full bg-black text-white py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors active:bg-gray-800">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 11l19-9-9 19-2-8-8-2z" />
+                </svg>
+                Directions
+              </button>
             </div>
           </div>
         </div>
