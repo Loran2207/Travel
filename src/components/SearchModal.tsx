@@ -96,44 +96,68 @@ export function SearchModal({ onClose, initialCity }: SearchModalProps) {
   };
 
   // Scroll picker to selected item
+  const ITEM_H = 64;
   const scrollToSelected = useCallback((idx: number, smooth = true) => {
     if (!pickerRef.current) return;
-    const itemH = 56;
-    const containerH = pickerRef.current.clientHeight;
-    const scrollTop = idx * itemH - (containerH / 2 - itemH / 2);
+    const scrollTop = idx * ITEM_H;
     pickerRef.current.scrollTo({ top: scrollTop, behavior: smooth ? "smooth" : "auto" });
+  }, []);
+
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handlePickerScroll = useCallback(() => {
+    if (!pickerRef.current) return;
+    const scrollTop = pickerRef.current.scrollTop;
+    const idx = Math.round(scrollTop / ITEM_H);
+    const clamped = Math.max(0, Math.min(DURATION_OPTIONS.length - 1, idx));
+    setSelectedDuration(clamped);
+
+    // Apply visual styles directly via DOM for instant feedback
+    const items = pickerRef.current.querySelectorAll("[data-index]");
+    items.forEach((el) => {
+      const i = parseInt(el.getAttribute("data-index") || "0");
+      const dist = Math.abs(i - clamped);
+      const span = el.querySelector("span");
+      if (!span) return;
+      if (dist === 0) {
+        span.style.fontSize = "30px";
+        span.style.fontWeight = "700";
+        span.style.color = "#111827";
+        span.style.opacity = "1";
+      } else if (dist === 1) {
+        span.style.fontSize = "20px";
+        span.style.fontWeight = "500";
+        span.style.color = "#9ca3af";
+        span.style.opacity = "1";
+      } else {
+        span.style.fontSize = "16px";
+        span.style.fontWeight = "400";
+        span.style.color = "#d1d5db";
+        span.style.opacity = dist > 2 ? "0.5" : "1";
+      }
+    });
+
+    // Snap after scroll ends
+    if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    scrollTimer.current = setTimeout(() => {
+      if (pickerRef.current) {
+        pickerRef.current.scrollTo({ top: clamped * ITEM_H, behavior: "smooth" });
+      }
+    }, 120);
   }, []);
 
   const initialScrollDone = useRef(false);
   useEffect(() => {
     if (activeSection === "duration" && !initialScrollDone.current) {
       initialScrollDone.current = true;
-      setTimeout(() => scrollToSelected(selectedDuration, false), 50);
+      setTimeout(() => {
+        scrollToSelected(selectedDuration, false);
+        setTimeout(() => handlePickerScroll(), 10);
+      }, 50);
     }
     if (activeSection !== "duration") {
       initialScrollDone.current = false;
     }
-  }, [activeSection, scrollToSelected, selectedDuration]);
-
-  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handlePickerScroll = useCallback(() => {
-    if (!pickerRef.current) return;
-    const itemH = 56;
-    const containerH = pickerRef.current.clientHeight;
-    const scrollTop = pickerRef.current.scrollTop;
-    const idx = Math.round((scrollTop + containerH / 2 - itemH / 2) / itemH);
-    const clamped = Math.max(0, Math.min(DURATION_OPTIONS.length - 1, idx));
-    setSelectedDuration(clamped);
-
-    // Snap after scroll ends
-    if (scrollTimer.current) clearTimeout(scrollTimer.current);
-    scrollTimer.current = setTimeout(() => {
-      if (pickerRef.current) {
-        const targetTop = clamped * itemH - (containerH / 2 - itemH / 2);
-        pickerRef.current.scrollTo({ top: targetTop, behavior: "smooth" });
-      }
-    }, 100);
-  }, []);
+  }, [activeSection, scrollToSelected, selectedDuration, handlePickerScroll]);
 
   // --- Full-screen search overlay ---
   if (activeSection === "where" && searchFocused) {
@@ -298,54 +322,45 @@ export function SearchModal({ onClose, initialCity }: SearchModalProps) {
               <p className="text-sm text-gray-500 mb-4">Number of days</p>
 
               {/* Drum picker */}
-              <div className="relative h-[224px] overflow-hidden">
+              <div className="relative h-[280px] overflow-hidden">
                 {/* Selection highlight band */}
-                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-14 bg-gray-100 rounded-xl pointer-events-none z-0" />
+                <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 h-16 bg-gray-100 rounded-2xl pointer-events-none z-0" />
 
-                {/* Fade gradients */}
-                <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-white to-transparent z-10 pointer-events-none" />
-                <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent z-10 pointer-events-none" />
+                {/* Fade top/bottom */}
+                <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white via-white/90 to-transparent z-10 pointer-events-none" />
+                <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white via-white/90 to-transparent z-10 pointer-events-none" />
 
                 {/* Scrollable list */}
                 <div
                   ref={pickerRef}
-                  className="absolute inset-0 overflow-y-auto hide-scrollbar snap-y snap-mandatory"
+                  className="absolute inset-0 overflow-y-auto hide-scrollbar"
                   onScroll={handlePickerScroll}
-                  style={{ scrollSnapType: "y mandatory" }}
                 >
-                  {/* Top spacer */}
-                  <div style={{ height: 84 }} />
+                  {/* Top spacer — pushes first item to center */}
+                  <div style={{ height: 112 }} />
 
-                  {DURATION_OPTIONS.map((opt, i) => {
-                    const isSelected = i === selectedDuration;
-                    const dist = Math.abs(i - selectedDuration);
-                    return (
-                      <div
-                        key={opt}
-                        className="h-14 flex items-center justify-center snap-center cursor-pointer"
-                        style={{ scrollSnapAlign: "center" }}
-                        onClick={() => {
-                          setSelectedDuration(i);
-                          scrollToSelected(i);
-                        }}
-                      >
-                        <span
-                          className={`transition-all duration-150 ${
-                            isSelected
-                              ? "text-2xl font-bold text-gray-900"
-                              : dist === 1
-                                ? "text-lg text-gray-400"
-                                : "text-base text-gray-300"
-                          }`}
-                        >
-                          {opt}
-                        </span>
-                      </div>
-                    );
-                  })}
+                  {DURATION_OPTIONS.map((opt, i) => (
+                    <div
+                      key={i}
+                      data-index={i}
+                      className="h-16 flex items-center justify-center cursor-pointer"
+                      onClick={() => {
+                        setSelectedDuration(i);
+                        scrollToSelected(i);
+                      }}
+                    >
+                      <span className="transition-none" style={{
+                        fontSize: i === selectedDuration ? 30 : Math.abs(i - selectedDuration) === 1 ? 20 : 16,
+                        fontWeight: i === selectedDuration ? 700 : Math.abs(i - selectedDuration) === 1 ? 500 : 400,
+                        color: i === selectedDuration ? "#111827" : Math.abs(i - selectedDuration) === 1 ? "#9ca3af" : "#d1d5db",
+                      }}>
+                        {opt}
+                      </span>
+                    </div>
+                  ))}
 
                   {/* Bottom spacer */}
-                  <div style={{ height: 84 }} />
+                  <div style={{ height: 112 }} />
                 </div>
               </div>
             </div>
