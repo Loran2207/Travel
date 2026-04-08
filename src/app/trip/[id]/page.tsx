@@ -641,10 +641,29 @@ export default function TripDetailPage() {
       })()}
 
       {/* Spot detail popup — Google Maps style */}
-      {selectedStop && !editMode && (
+      {selectedStop && !editMode && (() => {
+        // Enrich stop with defaults so all spots look full
+        const spot = {
+          ...selectedStop,
+          rating: selectedStop.rating ?? 4.5,
+          reviewCount: selectedStop.reviewCount ?? Math.floor(Math.random() * 5000 + 500),
+          address: selectedStop.address ?? `${selectedStop.name}, ${trip.city}, ${trip.country}`,
+          openingHours: selectedStop.openingHours ?? "Open 24 hours",
+          photos: selectedStop.photos ?? 4,
+          priceLevel: selectedStop.priceLevel ?? "Free",
+          tips: selectedStop.tips ?? [
+            `${selectedStop.name} is best visited in the morning for fewer crowds.`,
+            `Take your time here — there's more to see than you'd expect.`,
+          ],
+          reviews: selectedStop.reviews ?? [
+            { author: "Alex T.", rating: 5, timeAgo: "2 weeks ago", text: `Amazing place! ${selectedStop.name} exceeded our expectations. Highly recommend spending at least an hour here.` },
+            { author: "Maria S.", rating: 4, timeAgo: "1 month ago", text: `Beautiful spot worth visiting. The area around ${selectedStop.name} has great cafes for a break.` },
+          ],
+        };
+        return (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
           <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => setSelectedStop(null)} />
-          <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl animate-slide-up max-h-[90vh] flex flex-col">
+          <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl animate-slide-up flex flex-col" style={{ maxHeight: "92vh", minHeight: "70vh" }}>
             {/* Drag handle */}
             <div className="flex justify-center pt-3 pb-1">
               <div className="w-10 h-1 bg-gray-300 rounded-full" />
@@ -654,31 +673,31 @@ export default function TripDetailPage() {
             <div className="px-5 pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0 pr-3">
-                  <h2 className="text-xl font-bold text-gray-900">{selectedStop.name}</h2>
+                  <h2 className="text-xl font-bold text-gray-900">{spot.name}</h2>
                   <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-1">
-                    {selectedStop.rating && (
+                    {spot.rating && (
                       <div className="flex items-center gap-1">
-                        <span className="text-sm font-semibold text-gray-900">{selectedStop.rating}</span>
+                        <span className="text-sm font-semibold text-gray-900">{spot.rating}</span>
                         <div className="flex">
                           {[1, 2, 3, 4, 5].map((s) => (
-                            <svg key={s} className="w-3 h-3" viewBox="0 0 24 24" fill={s <= Math.round(selectedStop.rating!) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5">
+                            <svg key={s} className="w-3 h-3" viewBox="0 0 24 24" fill={s <= Math.round(spot.rating!) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5">
                               <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01z" />
                             </svg>
                           ))}
                         </div>
-                        <span className="text-xs text-gray-500">({selectedStop.reviewCount?.toLocaleString()})</span>
+                        <span className="text-xs text-gray-500">({spot.reviewCount?.toLocaleString()})</span>
                       </div>
                     )}
-                    {selectedStop.priceLevel && (
-                      <span className="text-xs text-gray-500">{selectedStop.priceLevel}</span>
+                    {spot.priceLevel && (
+                      <span className="text-xs text-gray-500">{spot.priceLevel}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-gray-500">{selectedStop.category}</span>
-                    {selectedStop.openingHours && (
+                    <span className="text-xs text-gray-500">{spot.category}</span>
+                    {spot.openingHours && (
                       <>
                         <span className="text-xs text-gray-300">·</span>
-                        <span className="text-xs text-gray-500">{selectedStop.openingHours}</span>
+                        <span className="text-xs text-gray-500">{spot.openingHours}</span>
                       </>
                     )}
                   </div>
@@ -694,7 +713,7 @@ export default function TripDetailPage() {
               {/* Photo gallery placeholder */}
               <div className="px-5 mb-4">
                 <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
-                  {Array.from({ length: selectedStop.photos || 3 }).map((_, i) => (
+                  {Array.from({ length: spot.photos || 3 }).map((_, i) => (
                     <div key={i} className={`${i === 0 ? "w-48 h-32" : "w-24 h-32"} rounded-xl bg-gray-100 flex-shrink-0 flex items-center justify-center`}>
                       <svg className="w-6 h-6 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                         <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" />
@@ -707,51 +726,51 @@ export default function TripDetailPage() {
               {/* About section */}
               <div className="px-5 pb-4">
                 <h3 className="text-sm font-bold text-gray-900 mb-2">About</h3>
-                <p className="text-sm text-gray-600 leading-relaxed">{selectedStop.description}</p>
+                <p className="text-sm text-gray-600 leading-relaxed">{spot.description}</p>
               </div>
 
               {/* Info rows */}
               <div className="px-5">
-                {selectedStop.address && (
+                {spot.address && (
                   <div className="flex items-start gap-3 py-3 border-t border-gray-100">
                     <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" /><circle cx="12" cy="9" r="2.5" />
                     </svg>
-                    <p className="text-sm text-gray-900 flex-1">{selectedStop.address}</p>
+                    <p className="text-sm text-gray-900 flex-1">{spot.address}</p>
                   </div>
                 )}
-                {selectedStop.openingHours && (
+                {spot.openingHours && (
                   <div className="flex items-center gap-3 py-3 border-t border-gray-100">
                     <svg className="w-5 h-5 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                       <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
                     </svg>
-                    <p className="text-sm text-gray-900 flex-1">{selectedStop.openingHours}</p>
+                    <p className="text-sm text-gray-900 flex-1">{spot.openingHours}</p>
                   </div>
                 )}
-                {selectedStop.phone && (
+                {spot.phone && (
                   <div className="flex items-center gap-3 py-3 border-t border-gray-100">
                     <svg className="w-5 h-5 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                       <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z" />
                     </svg>
-                    <p className="text-sm text-gray-900 flex-1">{selectedStop.phone}</p>
+                    <p className="text-sm text-gray-900 flex-1">{spot.phone}</p>
                   </div>
                 )}
-                {selectedStop.website && (
+                {spot.website && (
                   <div className="flex items-center gap-3 py-3 border-t border-gray-100">
                     <svg className="w-5 h-5 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                       <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
                     </svg>
-                    <p className="text-sm text-gray-900 flex-1">{selectedStop.website}</p>
+                    <p className="text-sm text-gray-900 flex-1">{spot.website}</p>
                   </div>
                 )}
               </div>
 
               {/* Tips */}
-              {selectedStop.tips && selectedStop.tips.length > 0 && (
+              {spot.tips && spot.tips.length > 0 && (
                 <div className="px-5 pt-4">
                   <h3 className="text-sm font-bold text-gray-900 mb-3">Tips from travelers</h3>
                   <div className="space-y-2">
-                    {selectedStop.tips.map((tip, i) => (
+                    {spot.tips.map((tip, i) => (
                       <div key={i} className="flex gap-2.5 bg-gray-50 rounded-xl p-3">
                         <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                           <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -764,13 +783,13 @@ export default function TripDetailPage() {
               )}
 
               {/* Reviews */}
-              {selectedStop.reviews && selectedStop.reviews.length > 0 && (
+              {spot.reviews && spot.reviews.length > 0 && (
                 <div className="px-5 pt-6 pb-6">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-bold text-gray-900">Reviews</h3>
-                    {selectedStop.rating && (
+                    {spot.rating && (
                       <div className="flex items-center gap-1">
-                        <span className="text-lg font-bold text-gray-900">{selectedStop.rating}</span>
+                        <span className="text-lg font-bold text-gray-900">{spot.rating}</span>
                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" stroke="none">
                           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14 2 9.27l6.91-1.01z" />
                         </svg>
@@ -779,7 +798,7 @@ export default function TripDetailPage() {
                   </div>
 
                   <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-2">
-                    {selectedStop.reviews.map((review, i) => (
+                    {spot.reviews.map((review, i) => (
                       <div key={i} className="w-64 flex-shrink-0 bg-gray-50 rounded-xl p-4 border border-gray-100">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center">
@@ -816,7 +835,8 @@ export default function TripDetailPage() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
