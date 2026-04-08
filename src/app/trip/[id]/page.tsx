@@ -18,22 +18,6 @@ function TransportIcon({ type }: { type: string }) {
   return <svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">{paths[type]}</svg>;
 }
 
-function ArrowUp({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
-  return (
-    <button disabled={disabled} onClick={onClick} className={`w-7 h-7 rounded-full border flex items-center justify-center ${disabled ? "border-gray-200 text-gray-300" : "border-gray-400 text-gray-600 active:bg-gray-100"}`}>
-      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
-    </button>
-  );
-}
-
-function ArrowDown({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
-  return (
-    <button disabled={disabled} onClick={onClick} className={`w-7 h-7 rounded-full border flex items-center justify-center ${disabled ? "border-gray-200 text-gray-300" : "border-gray-400 text-gray-600 active:bg-gray-100"}`}>
-      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12l7 7 7-7" /></svg>
-    </button>
-  );
-}
-
 export default function TripDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -48,6 +32,10 @@ export default function TripDetailPage() {
   const [editedDays, setEditedDays] = useState<TripDay[] | null>(null);
   const [checkedStops, setCheckedStops] = useState<Set<string>>(new Set());
   const [dragState, setDragState] = useState<{ dayNum: number; fromIdx: number; overIdx: number } | null>(null);
+  const [dayDragState, setDayDragState] = useState<{ fromIdx: number; overIdx: number } | null>(null);
+  const [showMoveDialog, setShowMoveDialog] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [spotAction, setSpotAction] = useState<{ dayNum: number; stopIdx: number; action: "move" | "delete" } | null>(null);
 
   // Add location
   const [addLocationDay, setAddLocationDay] = useState<number | null>(null);
@@ -99,27 +87,6 @@ export default function TripDetailPage() {
     setCheckedStops(new Set());
   };
 
-  // Day reorder
-  const moveDayUp = (idx: number) => {
-    if (!editedDays || idx <= 0) return;
-    setEditedDays(prev => {
-      if (!prev) return prev;
-      const arr = [...prev];
-      [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
-      return arr.map((d, i) => ({ ...d, day: i + 1 }));
-    });
-  };
-
-  const moveDayDown = (idx: number) => {
-    if (!editedDays || idx >= editedDays.length - 1) return;
-    setEditedDays(prev => {
-      if (!prev) return prev;
-      const arr = [...prev];
-      [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]];
-      return arr.map((d, i) => ({ ...d, day: i + 1 }));
-    });
-  };
-
   const toggleCheck = (dayNum: number, stopIdx: number) => {
     const key = `${dayNum}-${stopIdx}`;
     setCheckedStops(prev => {
@@ -141,6 +108,66 @@ export default function TripDetailPage() {
       });
     });
     setCheckedStops(new Set());
+    setShowDeleteConfirm(false);
+  };
+
+  const moveCheckedToDay = (targetDayNum: number) => {
+    if (!editedDays) return;
+    const stopsToMove: TripStop[] = [];
+    checkedStops.forEach(key => {
+      const [dayStr, idxStr] = key.split("-");
+      const day = editedDays.find(d => d.day === parseInt(dayStr));
+      if (day) stopsToMove.push(day.stops[parseInt(idxStr)]);
+    });
+
+    setEditedDays(prev => {
+      if (!prev) return prev;
+      return prev.map(day => {
+        // Remove from source days
+        const filtered = day.stops
+          .filter((_, idx) => !checkedStops.has(`${day.day}-${idx}`));
+        // Add to target day
+        const added = day.day === targetDayNum ? [...filtered, ...stopsToMove] : filtered;
+        return { ...day, stops: added.map((s, i) => ({ ...s, number: i + 1 })), spots: added.length };
+      });
+    });
+    setCheckedStops(new Set());
+    setShowMoveDialog(false);
+  };
+
+  // Single spot actions (from detail popup)
+  const deleteSingleSpot = (dayNum: number, stopIdx: number) => {
+    const days = editedDays || trip.days.map(d => ({ ...d, stops: d.stops.map(s => ({ ...s })) }));
+    const newDays = days.map(d => {
+      if (d.day !== dayNum) return d;
+      const stops = d.stops.filter((_, i) => i !== stopIdx).map((s, i) => ({ ...s, number: i + 1 }));
+      return { ...d, stops, spots: stops.length };
+    });
+    setEditedDays(newDays);
+    setSelectedStop(null);
+    setSpotAction(null);
+  };
+
+  const moveSingleSpotToDay = (fromDayNum: number, stopIdx: number, toDayNum: number) => {
+    const days = editedDays || trip.days.map(d => ({ ...d, stops: d.stops.map(s => ({ ...s })) }));
+    const sourceDay = days.find(d => d.day === fromDayNum);
+    if (!sourceDay) return;
+    const movingStop = sourceDay.stops[stopIdx];
+
+    const newDays = days.map(d => {
+      if (d.day === fromDayNum) {
+        const stops = d.stops.filter((_, i) => i !== stopIdx).map((s, i) => ({ ...s, number: i + 1 }));
+        return { ...d, stops, spots: stops.length };
+      }
+      if (d.day === toDayNum) {
+        const stops = [...d.stops, { ...movingStop, number: d.stops.length + 1 }];
+        return { ...d, stops, spots: stops.length };
+      }
+      return d;
+    });
+    setEditedDays(newDays);
+    setSelectedStop(null);
+    setSpotAction(null);
   };
 
   // --- Overview ---
@@ -214,13 +241,46 @@ export default function TripDetailPage() {
   const renderOverview = () => (
     <div className="space-y-3">
       {currentDays.map((day, idx) => (
-        <div key={day.day} className="bg-gray-50 rounded-2xl p-4">
+        <div
+          key={day.day}
+          className={`bg-gray-50 rounded-2xl p-4 transition-all ${
+            editMode ? "cursor-grab active:cursor-grabbing" : ""
+          } ${dayDragState?.fromIdx === idx ? "opacity-50 scale-95" : ""}
+          ${dayDragState && dayDragState.fromIdx !== idx && dayDragState.overIdx === idx ? "ring-2 ring-gray-400" : ""}`}
+          draggable={editMode}
+          onDragStart={editMode ? (e) => {
+            e.dataTransfer.effectAllowed = "move";
+            setDayDragState({ fromIdx: idx, overIdx: idx });
+          } : undefined}
+          onDragOver={editMode ? (e) => {
+            e.preventDefault();
+            if (dayDragState) setDayDragState({ ...dayDragState, overIdx: idx });
+          } : undefined}
+          onDrop={editMode ? (e) => {
+            e.preventDefault();
+            if (dayDragState && dayDragState.fromIdx !== idx && editedDays) {
+              setEditedDays(prev => {
+                if (!prev) return prev;
+                const arr = [...prev];
+                const [moved] = arr.splice(dayDragState.fromIdx, 1);
+                arr.splice(idx, 0, moved);
+                return arr.map((d, i) => ({ ...d, day: i + 1 }));
+              });
+            }
+            setDayDragState(null);
+          } : undefined}
+          onDragEnd={editMode ? () => setDayDragState(null) : undefined}
+        >
           <div className="flex items-center gap-3">
-            {/* Reorder arrows in edit mode */}
+            {/* Drag handle in edit mode */}
             {editMode && (
-              <div className="flex flex-col gap-1">
-                <ArrowUp disabled={idx === 0} onClick={() => moveDayUp(idx)} />
-                <ArrowDown disabled={idx === currentDays.length - 1} onClick={() => moveDayDown(idx)} />
+              <div className="flex flex-col gap-[3px] py-2 px-1 flex-shrink-0 touch-none">
+                {[0, 1, 2].map(r => (
+                  <div key={r} className="flex gap-[3px]">
+                    <div className="w-1 h-1 bg-gray-400 rounded-full" />
+                    <div className="w-1 h-1 bg-gray-400 rounded-full" />
+                  </div>
+                ))}
               </div>
             )}
 
@@ -263,9 +323,9 @@ export default function TripDetailPage() {
 
           return (
             <div key={`${day.day}-${i}`}>
-              <div className="flex gap-3">
-                {/* Number */}
-                <div className="flex flex-col items-center">
+              <div className="flex gap-3 items-start">
+                {/* Number — centered with card */}
+                <div className="flex flex-col items-center pt-5">
                   <div className={`w-7 h-7 rounded-full text-xs flex items-center justify-center font-bold flex-shrink-0 ${
                     editMode && checked ? "bg-black text-white" : "bg-gray-200 text-gray-500"
                   }`}>
@@ -553,10 +613,14 @@ export default function TripDetailPage() {
           }
         </div>
 
-        {/* Delete bar */}
+        {/* Move + Delete bar */}
         {editMode && checkedStops.size > 0 && (
-          <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-5 py-4 flex items-center justify-center z-10">
-            <button onClick={deleteChecked} className="flex items-center gap-2 border-2 border-gray-300 rounded-full px-6 py-3 text-sm font-medium text-gray-900 active:bg-gray-50 transition-colors">
+          <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-5 py-4 flex items-center gap-3 z-10">
+            <button onClick={() => setShowMoveDialog(true)} className="flex-1 flex items-center justify-center gap-2 border-2 border-gray-300 rounded-full py-3 text-sm font-medium text-gray-900 active:bg-gray-50 transition-colors">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+              Move
+            </button>
+            <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 flex items-center justify-center gap-2 border-2 border-gray-300 rounded-full py-3 text-sm font-medium text-gray-900 active:bg-gray-50 transition-colors">
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /></svg>
               Delete
               <span className="w-5 h-5 bg-black text-white text-[10px] font-bold rounded-full flex items-center justify-center">{checkedStops.size}</span>
@@ -564,6 +628,107 @@ export default function TripDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Delete confirmation */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-8">
+          <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => setShowDeleteConfirm(false)} />
+          <div className="relative bg-white rounded-2xl p-6 w-full max-w-[320px] animate-fade-in">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Delete {checkedStops.size} spot{checkedStops.size !== 1 ? "s" : ""}?</h3>
+            <p className="text-sm text-gray-500 mb-5">This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-900">Cancel</button>
+              <button onClick={deleteChecked} className="flex-1 py-2.5 bg-black text-white rounded-xl text-sm font-bold">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Move to day dialog */}
+      {showMoveDialog && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => setShowMoveDialog(false)} />
+          <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl animate-slide-up pb-6" style={{ maxHeight: "70vh" }}>
+            <div className="flex justify-center pt-3 pb-2"><div className="w-10 h-1 bg-gray-300 rounded-full" /></div>
+            <div className="px-5 pb-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-900">Move {checkedStops.size} spot{checkedStops.size !== 1 ? "s" : ""} to Day</h3>
+              <button onClick={() => setShowMoveDialog(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                <svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="px-5 overflow-y-auto">
+              {currentDays.map(day => {
+                const isCurrent = typeof activeTab === "number" && day.day === activeTab;
+                return (
+                  <button
+                    key={day.day}
+                    disabled={isCurrent}
+                    onClick={() => moveCheckedToDay(day.day)}
+                    className={`w-full flex items-center justify-between py-4 border-b border-gray-100 ${isCurrent ? "opacity-40" : "active:bg-gray-50"}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-bold text-white bg-black px-2.5 py-1 rounded-lg">Day {day.day}</span>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{day.city}</p>
+                        <p className="text-xs text-gray-500">{day.stops.length} spots · {day.distance}</p>
+                      </div>
+                    </div>
+                    {isCurrent ? (
+                      <span className="text-xs text-gray-400">Current</span>
+                    ) : (
+                      <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Spot action dialog (move/delete single from detail popup) */}
+      {spotAction && (
+        <div className="fixed inset-0 z-[60] flex items-end justify-center">
+          <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => setSpotAction(null)} />
+          <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl animate-slide-up pb-6">
+            <div className="flex justify-center pt-3 pb-2"><div className="w-10 h-1 bg-gray-300 rounded-full" /></div>
+            {spotAction.action === "delete" ? (
+              <div className="px-5">
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Delete this spot?</h3>
+                <p className="text-sm text-gray-500 mb-5">This action cannot be undone.</p>
+                <div className="flex gap-3">
+                  <button onClick={() => setSpotAction(null)} className="flex-1 py-2.5 border border-gray-300 rounded-xl text-sm font-medium text-gray-900">Cancel</button>
+                  <button onClick={() => deleteSingleSpot(spotAction.dayNum, spotAction.stopIdx)} className="flex-1 py-2.5 bg-black text-white rounded-xl text-sm font-bold">Delete</button>
+                </div>
+              </div>
+            ) : (
+              <div className="px-5">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Move to Day</h3>
+                {currentDays.map(day => {
+                  const isCurrent = day.day === spotAction.dayNum;
+                  return (
+                    <button
+                      key={day.day}
+                      disabled={isCurrent}
+                      onClick={() => moveSingleSpotToDay(spotAction.dayNum, spotAction.stopIdx, day.day)}
+                      className={`w-full flex items-center justify-between py-4 border-b border-gray-100 ${isCurrent ? "opacity-40" : "active:bg-gray-50"}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-white bg-black px-2.5 py-1 rounded-lg">Day {day.day}</span>
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">{day.city}</p>
+                          <p className="text-xs text-gray-500">{day.stops.length} spots · {day.distance}</p>
+                        </div>
+                      </div>
+                      {isCurrent && <span className="text-xs text-gray-400">Current</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Add location dialog — simplified */}
       {addLocationDay !== null && (() => {
@@ -824,14 +989,29 @@ export default function TripDetailPage() {
               )}
             </div>
 
-            {/* Direction button */}
-            <div className="border-t border-gray-100 px-5 py-4">
-              <button className="w-full bg-black text-white py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors active:bg-gray-800">
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M3 11l19-9-9 19-2-8-8-2z" />
-                </svg>
+            {/* Bottom actions */}
+            <div className="border-t border-gray-100 px-5 py-4 flex gap-3">
+              <button className="flex-1 bg-black text-white py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors active:bg-gray-800">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 11l19-9-9 19-2-8-8-2z" /></svg>
                 Directions
               </button>
+              {saved && (() => {
+                let dn = 0, si = 0;
+                for (const d of currentDays) {
+                  const idx = d.stops.findIndex(s => s.name === selectedStop.name);
+                  if (idx >= 0) { dn = d.day; si = idx; break; }
+                }
+                return dn > 0 ? (
+                  <>
+                    <button onClick={() => { setSelectedStop(null); setTimeout(() => setSpotAction({ dayNum: dn, stopIdx: si, action: "move" }), 100); }} className="w-12 py-3 border border-gray-300 rounded-xl flex items-center justify-center active:bg-gray-50">
+                      <svg className="w-4 h-4 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+                    </button>
+                    <button onClick={() => { setSelectedStop(null); setTimeout(() => setSpotAction({ dayNum: dn, stopIdx: si, action: "delete" }), 100); }} className="w-12 py-3 border border-gray-300 rounded-xl flex items-center justify-center active:bg-gray-50">
+                      <svg className="w-4 h-4 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /></svg>
+                    </button>
+                  </>
+                ) : null;
+              })()}
             </div>
           </div>
         </div>
