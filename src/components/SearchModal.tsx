@@ -25,16 +25,11 @@ const INTEREST_ICONS: Record<string, React.ReactNode> = {
   "Sports": <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 000 20M2 12h20" /></svg>,
 };
 
-// Duration picker options
-const DURATION_OPTIONS = [
-  "Half day", "1 day", "2 days", "3 days", "4 days", "5 days", "6 days",
-  "1 week", "10 days", "2 weeks", "3 weeks",
+// Duration picker: Half day + 1..30 days
+const DURATION_OPTIONS: string[] = [
+  "Half day",
+  ...Array.from({ length: 30 }, (_, i) => `${i + 1} ${i === 0 ? "day" : "days"}`),
 ];
-
-const DURATION_TO_DAYS: Record<string, number> = {
-  "Half day": 1, "1 day": 1, "2 days": 2, "3 days": 3, "4 days": 4,
-  "5 days": 5, "6 days": 6, "1 week": 7, "10 days": 10, "2 weeks": 14, "3 weeks": 21,
-};
 
 export function SearchModal({ onClose, initialCity }: SearchModalProps) {
   const router = useRouter();
@@ -68,8 +63,7 @@ export function SearchModal({ onClose, initialCity }: SearchModalProps) {
   }, []);
 
   const handleSearch = () => {
-    const label = DURATION_OPTIONS[selectedDuration];
-    const days = DURATION_TO_DAYS[label] || 1;
+    const days = selectedDuration === 0 ? 1 : selectedDuration;
     setSearch({
       cityId: selectedCity.id,
       cityName: selectedCity.name,
@@ -110,12 +104,18 @@ export function SearchModal({ onClose, initialCity }: SearchModalProps) {
     pickerRef.current.scrollTo({ top: scrollTop, behavior: smooth ? "smooth" : "auto" });
   }, []);
 
+  const initialScrollDone = useRef(false);
   useEffect(() => {
-    if (activeSection === "duration") {
+    if (activeSection === "duration" && !initialScrollDone.current) {
+      initialScrollDone.current = true;
       setTimeout(() => scrollToSelected(selectedDuration, false), 50);
+    }
+    if (activeSection !== "duration") {
+      initialScrollDone.current = false;
     }
   }, [activeSection, scrollToSelected, selectedDuration]);
 
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handlePickerScroll = useCallback(() => {
     if (!pickerRef.current) return;
     const itemH = 56;
@@ -124,6 +124,15 @@ export function SearchModal({ onClose, initialCity }: SearchModalProps) {
     const idx = Math.round((scrollTop + containerH / 2 - itemH / 2) / itemH);
     const clamped = Math.max(0, Math.min(DURATION_OPTIONS.length - 1, idx));
     setSelectedDuration(clamped);
+
+    // Snap after scroll ends
+    if (scrollTimer.current) clearTimeout(scrollTimer.current);
+    scrollTimer.current = setTimeout(() => {
+      if (pickerRef.current) {
+        const targetTop = clamped * itemH - (containerH / 2 - itemH / 2);
+        pickerRef.current.scrollTo({ top: targetTop, behavior: "smooth" });
+      }
+    }, 100);
   }, []);
 
   // --- Full-screen search overlay ---
