@@ -7,6 +7,7 @@ import { cities, searchCities } from "@/data/mock";
 
 interface SearchModalProps {
   onClose: () => void;
+  initialCity?: { id: string; name: string };
 }
 
 type Section = "where" | "duration" | null;
@@ -46,16 +47,16 @@ function isChipValue(hours: number): boolean {
   return QUICK_CHIPS.some(c => c.value === hours);
 }
 
-export function SearchModal({ onClose }: SearchModalProps) {
+export function SearchModal({ onClose, initialCity }: SearchModalProps) {
   const router = useRouter();
   const { setSearch } = useApp();
 
-  const [activeSection, setActiveSection] = useState<Section>("where");
+  const [activeSection, setActiveSection] = useState<Section>(initialCity ? "duration" : "where");
   const [searchFocused, setSearchFocused] = useState(false);
 
   // Where
   const [query, setQuery] = useState("");
-  const [selectedCity, setSelectedCity] = useState({ id: "", name: "" });
+  const [selectedCity, setSelectedCity] = useState(initialCity || { id: "", name: "" });
 
   // Duration (in hours)
   const [durationHours, setDurationHours] = useState(8);

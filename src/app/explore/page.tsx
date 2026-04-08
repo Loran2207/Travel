@@ -7,9 +7,20 @@ import { SearchModal } from "@/components/SearchModal";
 
 export default function ExplorePage() {
   const [showSearch, setShowSearch] = useState(false);
+  const [preselectedCity, setPreselectedCity] = useState<{ id: string; name: string } | undefined>();
 
   const popular = cities.filter((c) => popularCities.includes(c.id));
   const picks = cities.filter((c) => topPicks.includes(c.id));
+
+  const openSearchWithCity = (cityId: string, cityName: string) => {
+    setPreselectedCity({ id: cityId, name: cityName });
+    setShowSearch(true);
+  };
+
+  const openSearch = () => {
+    setPreselectedCity(undefined);
+    setShowSearch(true);
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -27,7 +38,7 @@ export default function ExplorePage() {
 
           {/* Search bar inside banner */}
           <button
-            onClick={() => setShowSearch(true)}
+            onClick={openSearch}
             className="w-full mt-5 flex items-center gap-3 bg-white rounded-full px-5 py-3.5 shadow-sm border border-gray-200 text-left"
           >
             <svg className="w-5 h-5 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -53,7 +64,7 @@ export default function ExplorePage() {
                 key={city.id}
                 name={city.name}
                 country={city.country}
-                onClick={() => setShowSearch(true)}
+                onClick={() => openSearchWithCity(city.id, city.name)}
               />
             ))}
           </div>
@@ -68,14 +79,14 @@ export default function ExplorePage() {
                 key={city.id}
                 name={city.name}
                 country={city.country}
-                onClick={() => setShowSearch(true)}
+                onClick={() => openSearchWithCity(city.id, city.name)}
               />
             ))}
           </div>
         </section>
       </div>
 
-      {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
+      {showSearch && <SearchModal onClose={() => setShowSearch(false)} initialCity={preselectedCity} />}
     </div>
   );
 }
