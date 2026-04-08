@@ -9,7 +9,7 @@
 
 ## Search Modal (Airbnb-style)
 
-- Accordion pattern with 2 collapsible sections: **Where**, **How long**
+- Accordion pattern with 3 collapsible sections: **Where**, **How long**, **Preferences**
 - Only one section expanded at a time; others show collapsed summary row
 - No tabs, no "Who" section — this is purely a trip search
 - **Where**: Search bar opens full-screen overlay with back arrow, type-ahead results using `searchCities()`, suggested cities from `mock.ts`

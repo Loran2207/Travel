@@ -3,14 +3,27 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/context/AppContext";
-import { cities, searchCities } from "@/data/mock";
+import { cities, searchCities, interests } from "@/data/mock";
 
 interface SearchModalProps {
   onClose: () => void;
   initialCity?: { id: string; name: string };
 }
 
-type Section = "where" | "duration" | null;
+type Section = "where" | "duration" | "preferences" | null;
+
+const INTEREST_ICONS: Record<string, React.ReactNode> = {
+  "History": <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" /></svg>,
+  "Food & Drink": <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zM6 1v3M10 1v3M14 1v3" /></svg>,
+  "Architecture": <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="4" y="2" width="16" height="20" rx="2" /><path d="M9 22V12h6v10M9 6h.01M15 6h.01M9 10h.01M15 10h.01" /></svg>,
+  "Nature": <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 22V8M5 12l7-8 7 8M8 17l4-5 4 5" /></svg>,
+  "Shopping": <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0" /></svg>,
+  "Art & Museums": <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>,
+  "Nightlife": <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 18a5 5 0 00-10 0M12 2v1M4.22 4.22l.71.71M1 12h1M4.22 19.78l.71-.71M23 12h-1M19.78 19.78l-.71-.71M19.78 4.22l-.71.71" /><circle cx="12" cy="12" r="4" /></svg>,
+  "Hidden Gems": <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>,
+  "Local Life": <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" /></svg>,
+  "Sports": <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 000 20M2 12h20" /></svg>,
+};
 
 // Slider checkpoints: value in hours
 const DURATION_STOPS = [
@@ -62,6 +75,9 @@ export function SearchModal({ onClose, initialCity }: SearchModalProps) {
   const [durationHours, setDurationHours] = useState(8);
   const [showCustom, setShowCustom] = useState(false);
   const [customDays, setCustomDays] = useState("");
+
+  // Preferences
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const sliderRef = useRef<HTMLDivElement>(null);
 
   const filteredCities = useMemo(() => {
@@ -84,12 +100,23 @@ export function SearchModal({ onClose, initialCity }: SearchModalProps) {
       cityId: selectedCity.id,
       cityName: selectedCity.name,
       duration: days,
-      interests: [],
+      interests: selectedInterests,
       budget: "",
       guests: 0,
     });
     onClose();
     router.push("/results");
+  };
+
+  const toggleInterest = (interest: string) => {
+    setSelectedInterests(prev =>
+      prev.includes(interest) ? prev.filter(i => i !== interest) : [...prev, interest]
+    );
+  };
+
+  const handleSurpriseMe = () => {
+    setSelectedInterests([]);
+    handleSearch();
   };
 
   const handleClearAll = () => {
@@ -98,6 +125,7 @@ export function SearchModal({ onClose, initialCity }: SearchModalProps) {
     setDurationHours(8);
     setShowCustom(false);
     setCustomDays("");
+    setSelectedInterests([]);
     setActiveSection("where");
   };
 
@@ -439,6 +467,62 @@ export function SearchModal({ onClose, initialCity }: SearchModalProps) {
               <span className="text-sm text-gray-500">How long</span>
               <span className="text-sm font-semibold text-gray-900">
                 {durationLabel(durationHours)}
+              </span>
+            </button>
+          )}
+
+          {/* PREFERENCES */}
+          {activeSection === "preferences" ? (
+            <div className="bg-white rounded-2xl p-5 mb-3 shadow-sm">
+              <h2 className="text-2xl font-bold text-gray-900 mb-1">Preferences</h2>
+              <p className="text-sm text-gray-500 mb-5">What are you into?</p>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                {interests.map((interest) => {
+                  const selected = selectedInterests.includes(interest);
+                  return (
+                    <button
+                      key={interest}
+                      onClick={() => toggleInterest(interest)}
+                      className={`flex items-center gap-3 p-3.5 rounded-xl border-2 text-left transition-colors ${
+                        selected
+                          ? "border-black bg-gray-50"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <div className={`flex-shrink-0 ${selected ? "text-gray-900" : "text-gray-400"}`}>
+                        {INTEREST_ICONS[interest] || <div className="w-5 h-5" />}
+                      </div>
+                      <span className={`text-sm font-medium ${selected ? "text-gray-900" : "text-gray-600"}`}>
+                        {interest}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Surprise me */}
+              <button
+                onClick={handleSurpriseMe}
+                className="w-full mt-5 flex items-center justify-center gap-2 py-3 border border-gray-300 rounded-full text-sm font-medium text-gray-600 hover:border-gray-400 transition-colors"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
+                  <circle cx="12" cy="12" r="4" />
+                </svg>
+                Skip, Surprise me
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setActiveSection("preferences")}
+              className="w-full bg-white rounded-2xl px-5 py-4 mb-3 shadow-sm flex items-center justify-between"
+            >
+              <span className="text-sm text-gray-500">Preferences</span>
+              <span className="text-sm font-semibold text-gray-900">
+                {selectedInterests.length > 0
+                  ? `${selectedInterests.length} selected`
+                  : "Any"}
               </span>
             </button>
           )}
