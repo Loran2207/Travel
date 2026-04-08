@@ -47,9 +47,7 @@ export default function TripDetailPage() {
   const [editMode, setEditMode] = useState(false);
   const [editedDays, setEditedDays] = useState<TripDay[] | null>(null);
   const [checkedStops, setCheckedStops] = useState<Set<string>>(new Set());
-
-  // Transport picker
-  const [transportPicker, setTransportPicker] = useState<{ dayNum: number; stopIdx: number } | null>(null);
+  const [dragState, setDragState] = useState<{ dayNum: number; fromIdx: number; overIdx: number } | null>(null);
 
   // Add location
   const [addLocationDay, setAddLocationDay] = useState<number | null>(null);
@@ -86,7 +84,7 @@ export default function TripDetailPage() {
   const saved = isTripSaved(trip.id);
   const currentDays = editedDays || trip.days;
   const totalSpots = currentDays.reduce((sum, d) => sum + d.stops.length, 0);
-  const sheetTop = sheetPosition === "full" ? "8%" : sheetPosition === "half" ? "45%" : "78%";
+  const sheetTop = sheetPosition === "full" ? "15%" : sheetPosition === "half" ? "45%" : "78%";
 
   const enterEditMode = () => {
     setEditedDays(trip.days.map(d => ({ ...d, stops: d.stops.map(s => ({ ...s })) })));
@@ -119,35 +117,6 @@ export default function TripDetailPage() {
       const arr = [...prev];
       [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]];
       return arr.map((d, i) => ({ ...d, day: i + 1 }));
-    });
-  };
-
-  // Stop reorder within a day
-  const moveStopUp = (dayNum: number, idx: number) => {
-    if (!editedDays || idx <= 0) return;
-    setEditedDays(prev => {
-      if (!prev) return prev;
-      return prev.map(day => {
-        if (day.day !== dayNum) return day;
-        const stops = [...day.stops];
-        [stops[idx - 1], stops[idx]] = [stops[idx], stops[idx - 1]];
-        return { ...day, stops: stops.map((s, i) => ({ ...s, number: i + 1 })) };
-      });
-    });
-  };
-
-  const moveStopDown = (dayNum: number, idx: number) => {
-    if (!editedDays) return;
-    const day = editedDays.find(d => d.day === dayNum);
-    if (!day || idx >= day.stops.length - 1) return;
-    setEditedDays(prev => {
-      if (!prev) return prev;
-      return prev.map(d => {
-        if (d.day !== dayNum) return d;
-        const stops = [...d.stops];
-        [stops[idx], stops[idx + 1]] = [stops[idx + 1], stops[idx]];
-        return { ...d, stops: stops.map((s, i) => ({ ...s, number: i + 1 })) };
-      });
     });
   };
 
@@ -215,7 +184,6 @@ export default function TripDetailPage() {
     } else {
       setEditedDays(newDays);
     }
-    setTransportPicker(null);
   };
 
   const addLocation = () => {
@@ -309,11 +277,83 @@ export default function TripDetailPage() {
                 {/* Card */}
                 <div className="flex-1 pb-2">
                   {editMode ? (
-                    <div className={`flex items-center gap-2 bg-gray-50 rounded-xl p-3 border-2 transition-colors ${checked ? "border-black" : "border-transparent"}`}>
-                      {/* Up/Down arrows */}
-                      <div className="flex flex-col gap-1">
-                        <ArrowUp disabled={i === 0} onClick={() => moveStopUp(day.day, i)} />
-                        <ArrowDown disabled={i === day.stops.length - 1} onClick={() => moveStopDown(day.day, i)} />
+                    <div
+                      className={`flex items-center gap-2 bg-gray-50 rounded-xl p-3 border-2 transition-all ${
+                        checked ? "border-black" : dragState?.dayNum === day.day && dragState?.overIdx === i ? "border-gray-400 bg-gray-100" : "border-transparent"
+                      } ${dragState?.dayNum === day.day && dragState?.fromIdx === i ? "opacity-50 scale-95" : ""}`}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = "move";
+                        setDragState({ dayNum: day.day, fromIdx: i, overIdx: i });
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (dragState && dragState.dayNum === day.day) {
+                          setDragState({ ...dragState, overIdx: i });
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (dragState && dragState.dayNum === day.day && dragState.fromIdx !== i) {
+                          // Perform the move
+                          if (!editedDays) return;
+                          setEditedDays(prev => {
+                            if (!prev) return prev;
+                            return prev.map(d => {
+                              if (d.day !== day.day) return d;
+                              const stops = [...d.stops];
+                              const [moved] = stops.splice(dragState.fromIdx, 1);
+                              stops.splice(i, 0, moved);
+                              return { ...d, stops: stops.map((s, idx) => ({ ...s, number: idx + 1 })) };
+                            });
+                          });
+                        }
+                        setDragState(null);
+                      }}
+                      onDragEnd={() => setDragState(null)}
+                      onTouchStart={(e) => {
+                        const touch = e.touches[0];
+                        const startY = touch.clientY;
+                        const startIdx = i;
+                        setDragState({ dayNum: day.day, fromIdx: i, overIdx: i });
+
+                        const onMove = (ev: TouchEvent) => {
+                          const y = ev.touches[0].clientY;
+                          const delta = Math.round((y - startY) / 72);
+                          const newIdx = Math.max(0, Math.min(day.stops.length - 1, startIdx + delta));
+                          setDragState(prev => prev ? { ...prev, overIdx: newIdx } : null);
+                        };
+                        const onEnd = () => {
+                          setDragState(prev => {
+                            if (prev && prev.fromIdx !== prev.overIdx && editedDays) {
+                              setEditedDays(days => {
+                                if (!days) return days;
+                                return days.map(d => {
+                                  if (d.day !== day.day) return d;
+                                  const stops = [...d.stops];
+                                  const [moved] = stops.splice(prev.fromIdx, 1);
+                                  stops.splice(prev.overIdx, 0, moved);
+                                  return { ...d, stops: stops.map((s, idx) => ({ ...s, number: idx + 1 })) };
+                                });
+                              });
+                            }
+                            return null;
+                          });
+                          window.removeEventListener("touchmove", onMove);
+                          window.removeEventListener("touchend", onEnd);
+                        };
+                        window.addEventListener("touchmove", onMove, { passive: true });
+                        window.addEventListener("touchend", onEnd);
+                      }}
+                    >
+                      {/* Drag handle */}
+                      <div className="flex flex-col gap-[3px] cursor-grab active:cursor-grabbing py-2 px-1 flex-shrink-0 touch-none">
+                        {[0, 1, 2].map(r => (
+                          <div key={r} className="flex gap-[3px]">
+                            <div className="w-1 h-1 bg-gray-400 rounded-full" />
+                            <div className="w-1 h-1 bg-gray-400 rounded-full" />
+                          </div>
+                        ))}
                       </div>
 
                       <div className="w-12 h-12 rounded-lg bg-gray-200 flex-shrink-0 flex items-center justify-center">
@@ -354,20 +394,31 @@ export default function TripDetailPage() {
                 </div>
               </div>
 
-              {/* Transport pill */}
+              {/* Transport pill — inline toggle walk/drive when saved */}
               {!editMode && stop.transport && (
                 <div className="flex gap-3 mb-2">
                   <div className="flex flex-col items-center w-7"><div className="w-px flex-1 bg-gray-200" /></div>
                   <div className="flex-1 py-1">
                     {saved ? (
-                      <button
-                        onClick={() => setTransportPicker({ dayNum: day.day, stopIdx: i })}
-                        className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1.5 active:bg-gray-50 transition-colors"
-                      >
-                        <TransportIcon type={stop.transport.type} />
-                        <span className="text-xs text-gray-600">{stop.transport.duration} · {stop.transport.distance}</span>
-                        <svg className="w-3 h-3 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
-                      </button>
+                      <div className="inline-flex items-center bg-gray-100 rounded-full p-0.5">
+                        {(["walk", "drive"] as const).map((mode) => {
+                          const isActive = stop.transport!.type === mode;
+                          const opts = getTransportOptions(stop.transport!);
+                          const opt = opts.find(o => o.type === mode);
+                          return (
+                            <button
+                              key={mode}
+                              onClick={() => changeTransport(day.day, i, mode)}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors ${
+                                isActive ? "bg-white shadow-sm text-gray-900 font-medium" : "text-gray-500"
+                              }`}
+                            >
+                              <TransportIcon type={mode} />
+                              <span>{opt?.duration}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     ) : (
                       <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1.5">
                         <TransportIcon type={stop.transport.type} />
@@ -578,55 +629,6 @@ export default function TripDetailPage() {
                   <p className="text-xs text-gray-400">Type a place name or paste a full address</p>
                 </div>
               )}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Transport picker popup */}
-      {transportPicker && (() => {
-        const days = editedDays || trip.days;
-        const day = days.find(d => d.day === transportPicker.dayNum);
-        const stop = day?.stops[transportPicker.stopIdx];
-        if (!stop?.transport) return null;
-        const options = getTransportOptions(stop.transport);
-        return (
-          <div className="fixed inset-0 z-50 flex items-end justify-center">
-            <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => setTransportPicker(null)} />
-            <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl animate-slide-up pb-6">
-              <div className="flex justify-center pt-3 pb-2">
-                <div className="w-10 h-1 bg-gray-300 rounded-full" />
-              </div>
-              <div className="px-5 pb-3 flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-900">How to get there</h3>
-                <button onClick={() => setTransportPicker(null)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
-                </button>
-              </div>
-              <p className="px-5 text-xs text-gray-500 mb-4">
-                {stop.name} → {day!.stops[transportPicker.stopIdx + 1]?.name || "Next stop"}
-              </p>
-              <div className="px-5 grid grid-cols-2 gap-3">
-                {options.map((opt) => {
-                  const isActive = stop.transport!.type === opt.type;
-                  return (
-                    <button
-                      key={opt.type}
-                      onClick={() => changeTransport(transportPicker.dayNum, transportPicker.stopIdx, opt.type)}
-                      className={`flex flex-col items-center p-4 rounded-2xl border-2 transition-colors ${
-                        isActive ? "border-black bg-gray-50" : "border-gray-200 hover:border-gray-300"
-                      }`}
-                    >
-                      <div className={`mb-2 ${isActive ? "text-gray-900" : "text-gray-400"}`}>
-                        <TransportIcon type={opt.type} />
-                      </div>
-                      <span className="text-sm font-bold text-gray-900 capitalize">{opt.type}</span>
-                      <span className="text-xs text-gray-500 mt-0.5">{opt.duration}</span>
-                      <span className="text-[10px] text-gray-400 mt-0.5">{opt.distance}</span>
-                    </button>
-                  );
-                })}
-              </div>
             </div>
           </div>
         );
