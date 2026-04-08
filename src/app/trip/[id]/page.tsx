@@ -48,6 +48,9 @@ export default function TripDetailPage() {
   const [editedDays, setEditedDays] = useState<TripDay[] | null>(null);
   const [checkedStops, setCheckedStops] = useState<Set<string>>(new Set());
 
+  // Transport picker
+  const [transportPicker, setTransportPicker] = useState<{ dayNum: number; stopIdx: number } | null>(null);
+
   // Bottom sheet
   const sheetRef = useRef<HTMLDivElement>(null);
   const [sheetPosition, setSheetPosition] = useState<"half" | "full" | "collapsed">("half");
@@ -168,6 +171,49 @@ export default function TripDetailPage() {
   };
 
   // --- Overview ---
+  // Transport mode estimates (mock multipliers based on distance)
+  const getTransportOptions = (transport: { type: string; duration: string; distance: string }) => {
+    const distKm = parseFloat(transport.distance.replace(/[^0-9.]/g, "")) || 1;
+    const distM = Math.round(distKm * 1000);
+    const steps = Math.round(distM * 1.3);
+    return [
+      { type: "walk" as const, duration: `${Math.round(distKm * 12)} min`, distance: `${steps.toLocaleString()} steps`, distSub: transport.distance },
+      { type: "drive" as const, duration: `${Math.max(1, Math.round(distKm * 2))} min`, distance: transport.distance, distSub: "" },
+      { type: "bus" as const, duration: `${Math.round(distKm * 4)} min`, distance: transport.distance, distSub: "" },
+      { type: "metro" as const, duration: `${Math.max(2, Math.round(distKm * 3))} min`, distance: transport.distance, distSub: "" },
+    ];
+  };
+
+  const changeTransport = (dayNum: number, stopIdx: number, newType: "walk" | "drive" | "bus" | "metro") => {
+    const days = editedDays || trip.days;
+    const day = days.find(d => d.day === dayNum);
+    if (!day) return;
+    const stop = day.stops[stopIdx];
+    if (!stop?.transport) return;
+
+    const options = getTransportOptions(stop.transport);
+    const selected = options.find(o => o.type === newType);
+    if (!selected) return;
+
+    const newDays = (editedDays || trip.days).map(d => {
+      if (d.day !== dayNum) return d;
+      return {
+        ...d,
+        stops: d.stops.map((s, i) => {
+          if (i !== stopIdx || !s.transport) return s;
+          return { ...s, transport: { type: newType, duration: selected.duration, distance: selected.type === "walk" ? selected.distSub : selected.distance } };
+        }),
+      };
+    });
+
+    if (!editedDays) {
+      setEditedDays(newDays.map(d => ({ ...d, stops: d.stops.map(s => ({ ...s })) })));
+    } else {
+      setEditedDays(newDays);
+    }
+    setTransportPicker(null);
+  };
+
   const renderOverview = () => (
     <div className="space-y-3">
       {currentDays.map((day, idx) => (
@@ -279,15 +325,26 @@ export default function TripDetailPage() {
                 </div>
               </div>
 
-              {/* Transport */}
+              {/* Transport pill */}
               {!editMode && stop.transport && (
                 <div className="flex gap-3 mb-2">
                   <div className="flex flex-col items-center w-7"><div className="w-px flex-1 bg-gray-200" /></div>
                   <div className="flex-1 py-1">
-                    <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1.5">
-                      <TransportIcon type={stop.transport.type} />
-                      <span className="text-xs text-gray-600">{stop.transport.duration} · {stop.transport.distance}</span>
-                    </div>
+                    {saved ? (
+                      <button
+                        onClick={() => setTransportPicker({ dayNum: day.day, stopIdx: i })}
+                        className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1.5 active:bg-gray-50 transition-colors"
+                      >
+                        <TransportIcon type={stop.transport.type} />
+                        <span className="text-xs text-gray-600">{stop.transport.duration} · {stop.transport.distance}</span>
+                        <svg className="w-3 h-3 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" /></svg>
+                      </button>
+                    ) : (
+                      <div className="inline-flex items-center gap-2 bg-white border border-gray-200 rounded-full px-3 py-1.5">
+                        <TransportIcon type={stop.transport.type} />
+                        <span className="text-xs text-gray-600">{stop.transport.duration} · {stop.transport.distance}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -393,6 +450,55 @@ export default function TripDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Transport picker popup */}
+      {transportPicker && (() => {
+        const days = editedDays || trip.days;
+        const day = days.find(d => d.day === transportPicker.dayNum);
+        const stop = day?.stops[transportPicker.stopIdx];
+        if (!stop?.transport) return null;
+        const options = getTransportOptions(stop.transport);
+        return (
+          <div className="fixed inset-0 z-50 flex items-end justify-center">
+            <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => setTransportPicker(null)} />
+            <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl animate-slide-up pb-6">
+              <div className="flex justify-center pt-3 pb-2">
+                <div className="w-10 h-1 bg-gray-300 rounded-full" />
+              </div>
+              <div className="px-5 pb-3 flex items-center justify-between">
+                <h3 className="text-lg font-bold text-gray-900">How to get there</h3>
+                <button onClick={() => setTransportPicker(null)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <p className="px-5 text-xs text-gray-500 mb-4">
+                {stop.name} → {day!.stops[transportPicker.stopIdx + 1]?.name || "Next stop"}
+              </p>
+              <div className="px-5 grid grid-cols-2 gap-3">
+                {options.map((opt) => {
+                  const isActive = stop.transport!.type === opt.type;
+                  return (
+                    <button
+                      key={opt.type}
+                      onClick={() => changeTransport(transportPicker.dayNum, transportPicker.stopIdx, opt.type)}
+                      className={`flex flex-col items-center p-4 rounded-2xl border-2 transition-colors ${
+                        isActive ? "border-black bg-gray-50" : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <div className={`mb-2 ${isActive ? "text-gray-900" : "text-gray-400"}`}>
+                        <TransportIcon type={opt.type} />
+                      </div>
+                      <span className="text-sm font-bold text-gray-900 capitalize">{opt.type}</span>
+                      <span className="text-xs text-gray-500 mt-0.5">{opt.duration}</span>
+                      <span className="text-[10px] text-gray-400 mt-0.5">{opt.distance}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Spot detail popup — Google Maps style */}
       {selectedStop && !editMode && (
