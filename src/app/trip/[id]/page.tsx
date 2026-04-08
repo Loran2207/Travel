@@ -34,6 +34,7 @@ export default function TripDetailPage() {
   const [dragState, setDragState] = useState<{ dayNum: number; fromIdx: number; overIdx: number } | null>(null);
   const [dayDragState, setDayDragState] = useState<{ fromIdx: number; overIdx: number } | null>(null);
   const [showMoveDialog, setShowMoveDialog] = useState(false);
+  const [moveDayTarget, setMoveDayTarget] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [spotAction, setSpotAction] = useState<{ dayNum: number; stopIdx: number; action: "move" | "delete" } | null>(null);
 
@@ -617,7 +618,7 @@ export default function TripDetailPage() {
         {editMode && checkedStops.size > 0 && (
           <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-5 py-4 flex items-center gap-3 z-10">
             <button onClick={() => setShowMoveDialog(true)} className="flex-1 flex items-center justify-center gap-2 border-2 border-gray-300 rounded-full py-3 text-sm font-medium text-gray-900 active:bg-gray-50 transition-colors">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
               Move
             </button>
             <button onClick={() => setShowDeleteConfirm(true)} className="flex-1 flex items-center justify-center gap-2 border-2 border-gray-300 rounded-full py-3 text-sm font-medium text-gray-900 active:bg-gray-50 transition-colors">
@@ -647,24 +648,25 @@ export default function TripDetailPage() {
       {/* Move to day dialog */}
       {showMoveDialog && (
         <div className="fixed inset-0 z-50 flex items-end justify-center">
-          <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => setShowMoveDialog(false)} />
-          <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl animate-slide-up pb-6" style={{ maxHeight: "70vh" }}>
+          <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => { setShowMoveDialog(false); setMoveDayTarget(null); }} />
+          <div className="relative w-full max-w-[430px] bg-white rounded-t-3xl animate-slide-up flex flex-col" style={{ maxHeight: "70vh" }}>
             <div className="flex justify-center pt-3 pb-2"><div className="w-10 h-1 bg-gray-300 rounded-full" /></div>
             <div className="px-5 pb-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900">Move {checkedStops.size} spot{checkedStops.size !== 1 ? "s" : ""} to Day</h3>
-              <button onClick={() => setShowMoveDialog(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+              <h3 className="text-lg font-bold text-gray-900">Move to Day</h3>
+              <button onClick={() => { setShowMoveDialog(false); setMoveDayTarget(null); }} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
                 <svg className="w-4 h-4 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12" /></svg>
               </button>
             </div>
-            <div className="px-5 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto px-5">
               {currentDays.map(day => {
                 const isCurrent = typeof activeTab === "number" && day.day === activeTab;
+                const isSelected = moveDayTarget === day.day;
                 return (
                   <button
                     key={day.day}
                     disabled={isCurrent}
-                    onClick={() => moveCheckedToDay(day.day)}
-                    className={`w-full flex items-center justify-between py-4 border-b border-gray-100 ${isCurrent ? "opacity-40" : "active:bg-gray-50"}`}
+                    onClick={() => setMoveDayTarget(day.day)}
+                    className={`w-full flex items-center justify-between py-4 border-b border-gray-100 transition-colors ${isCurrent ? "opacity-40" : "active:bg-gray-50"}`}
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-bold text-white bg-black px-2.5 py-1 rounded-lg">Day {day.day}</span>
@@ -676,11 +678,23 @@ export default function TripDetailPage() {
                     {isCurrent ? (
                       <span className="text-xs text-gray-400">Current</span>
                     ) : (
-                      <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-black" : "border-gray-300"}`}>
+                        {isSelected && <div className="w-2.5 h-2.5 bg-black rounded-full" />}
+                      </div>
                     )}
                   </button>
                 );
               })}
+            </div>
+            {/* Confirm button */}
+            <div className="px-5 pt-4 pb-2">
+              <button
+                onClick={() => { if (moveDayTarget) { moveCheckedToDay(moveDayTarget); setMoveDayTarget(null); } }}
+                disabled={!moveDayTarget}
+                className="w-full bg-black text-white py-3.5 rounded-xl text-sm font-bold disabled:bg-gray-300 disabled:cursor-default transition-colors"
+              >
+                {moveDayTarget ? `Move to Day ${moveDayTarget}` : "Select a day"}
+              </button>
             </div>
           </div>
         </div>
@@ -706,12 +720,13 @@ export default function TripDetailPage() {
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Move to Day</h3>
                 {currentDays.map(day => {
                   const isCurrent = day.day === spotAction.dayNum;
+                  const isSelected = moveDayTarget === day.day;
                   return (
                     <button
                       key={day.day}
                       disabled={isCurrent}
-                      onClick={() => moveSingleSpotToDay(spotAction.dayNum, spotAction.stopIdx, day.day)}
-                      className={`w-full flex items-center justify-between py-4 border-b border-gray-100 ${isCurrent ? "opacity-40" : "active:bg-gray-50"}`}
+                      onClick={() => setMoveDayTarget(day.day)}
+                      className={`w-full flex items-center justify-between py-4 border-b border-gray-100 transition-colors ${isCurrent ? "opacity-40" : "active:bg-gray-50"}`}
                     >
                       <div className="flex items-center gap-3">
                         <span className="text-xs font-bold text-white bg-black px-2.5 py-1 rounded-lg">Day {day.day}</span>
@@ -720,10 +735,25 @@ export default function TripDetailPage() {
                           <p className="text-xs text-gray-500">{day.stops.length} spots · {day.distance}</p>
                         </div>
                       </div>
-                      {isCurrent && <span className="text-xs text-gray-400">Current</span>}
+                      {isCurrent ? (
+                        <span className="text-xs text-gray-400">Current</span>
+                      ) : (
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-black" : "border-gray-300"}`}>
+                          {isSelected && <div className="w-2.5 h-2.5 bg-black rounded-full" />}
+                        </div>
+                      )}
                     </button>
                   );
                 })}
+                <div className="pt-4 pb-2">
+                  <button
+                    onClick={() => { if (moveDayTarget) { moveSingleSpotToDay(spotAction.dayNum, spotAction.stopIdx, moveDayTarget); setMoveDayTarget(null); } }}
+                    disabled={!moveDayTarget}
+                    className="w-full bg-black text-white py-3.5 rounded-xl text-sm font-bold disabled:bg-gray-300 disabled:cursor-default transition-colors"
+                  >
+                    {moveDayTarget ? `Move to Day ${moveDayTarget}` : "Select a day"}
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -1004,7 +1034,7 @@ export default function TripDetailPage() {
                 return dn > 0 ? (
                   <>
                     <button onClick={() => { setSelectedStop(null); setTimeout(() => setSpotAction({ dayNum: dn, stopIdx: si, action: "move" }), 100); }} className="w-12 py-3 border border-gray-300 rounded-xl flex items-center justify-center active:bg-gray-50">
-                      <svg className="w-4 h-4 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+                      <svg className="w-4 h-4 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7" /></svg>
                     </button>
                     <button onClick={() => { setSelectedStop(null); setTimeout(() => setSpotAction({ dayNum: dn, stopIdx: si, action: "delete" }), 100); }} className="w-12 py-3 border border-gray-300 rounded-xl flex items-center justify-center active:bg-gray-50">
                       <svg className="w-4 h-4 text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /></svg>
